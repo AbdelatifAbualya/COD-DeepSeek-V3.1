@@ -1,0 +1,5177 @@
+<!DOCTYPE html>
+<html lang="en" data-darkreader-mode="dynamic" data-darkreader-scheme="dark">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LLM Playground (COT vs COD)</title>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* --------------------------------
+       Global Styles
+    -------------------------------- */
+    :root {
+      --bg-primary: #111215;
+      --bg-secondary: #16181d;
+      --bg-tertiary: #1e2028;
+      --bg-component: #262a36;
+      --bg-hover: #2d3341;
+      --text-primary: #e9ecf3;
+      --text-secondary: #a9b1c2;
+      --text-tertiary: #7a8499;
+      --accent-primary: #5686f5;
+      --accent-secondary: #4169e1;
+      --accent-tertiary: #3e4daa;
+      --success: #4ade80;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border-light: rgba(255, 255, 255, 0.1);
+      --border-medium: rgba(255, 255, 255, 0.15);
+      --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.2);
+      --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.25);
+      --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.35);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --transition-fast: 0.15s ease;
+      --transition-normal: 0.25s ease;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+      overflow: hidden;
+      font-size: 15px;
+    }
+    
+    .app-container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    /* --------------------------------
+       Sidebar Styles
+    -------------------------------- */
+    .sidebar {
+      width: 280px;
+      background-color: var(--bg-secondary);
+      padding: 1.25rem;
+      border-right: 1px solid var(--border-light);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .sidebar h2 {
+      margin-top: 0;
+      margin-bottom: 1.25rem;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 1rem 0;
+      flex-grow: 1;
+    }
+    
+    .sidebar li {
+      padding: 0.75rem 1rem;
+      margin-bottom: 0.5rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background-color var(--transition-fast), transform var(--transition-fast);
+      font-weight: 500;
+    }
+    
+    .sidebar li:hover {
+      background-color: var(--bg-hover);
+      transform: translateY(-1px);
+    }
+    
+    .sidebar li.active {
+      background-color: var(--bg-hover);
+      border-left: 3px solid var(--accent-primary);
+      color: var(--accent-primary);
+    }
+    
+    .sidebar-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: auto;
+    }
+    
+    .sidebar button {
+      width: 100%;
+      padding: 0.75rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      box-shadow: var(--shadow-sm);
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+    }
+    
+    .sidebar button:hover {
+      background-color: var(--bg-hover);
+      transform: translateY(-1px);
+    }
+    
+    .sidebar button:active {
+      transform: translateY(0);
+    }
+    
+    .sidebar button svg {
+      width: 18px;
+      height: 18px;
+    }
+    
+    #downloadTxtBtn, 
+    #downloadPdfBtn {
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-medium);
+    }
+    
+    #clearThreadBtn {
+      margin-top: 0.75rem;
+      background-color: rgba(239, 68, 68, 0.2);
+      color: var(--error);
+      font-weight: 500;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    
+    #clearThreadBtn:hover {
+      background-color: rgba(239, 68, 68, 0.3);
+    }
+    
+    #newThreadBtn {
+      background-color: var(--accent-primary);
+      color: white;
+    }
+    
+    #newThreadBtn:hover {
+      background-color: var(--accent-secondary);
+    }
+    
+    /* --------------------------------
+       Chat Container Styles
+    -------------------------------- */
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: linear-gradient(160deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+      position: relative;
+    }
+    
+    .chat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1rem 1.5rem;
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-light);
+      box-shadow: var(--shadow-sm);
+      z-index: 10;
+      height: 64px;
+    }
+    
+    .chat-header h1#pageTitle {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      user-select: none;
+    }
+    
+    .chat-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    .settings-btn {
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      transition: background-color var(--transition-fast);
+    }
+    
+    .settings-btn:hover {
+      background-color: var(--bg-hover);
+    }
+    
+    .current-model-display {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      background-color: var(--bg-tertiary);
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      border: 1px solid var(--border-light);
+    }
+    
+    .reasoning-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 0.7rem;
+      margin-left: 6px;
+      font-weight: 500;
+    }
+    
+    .chat-messages {
+      flex: 1;
+      padding: 1.5rem;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    
+    .chat-input-container {
+      border-top: 1px solid var(--border-light);
+      background-color: var(--bg-secondary);
+      padding: 1.25rem;
+      position: relative;
+    }
+    
+    .chat-input {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      background-color: var(--bg-tertiary);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      min-height: 60px;
+    }
+    
+    .chat-input textarea {
+      flex: 1;
+      min-height: 24px;
+      max-height: 200px;
+      padding: 8px 12px;
+      background-color: var(--bg-component);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+      transition: all var(--transition-fast);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+    }
+    
+    .chat-input textarea:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 2px rgba(86, 134, 245, 0.15);
+    }
+    
+    .chat-input-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-left: 4px;
+    }
+    
+    #sendBtn {
+      background-color: var(--accent-primary);
+      color: white;
+      width: 60px;
+      height: 36px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      border: none;
+      font-weight: 500;
+    }
+    
+    #sendBtn:hover {
+      background-color: var(--accent-secondary);
+      transform: translateY(-1px);
+    }
+    
+    .action-button {
+      width: 32px !important;
+      height: 32px !important;
+      padding: 0 !important;
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--bg-component) !important;
+      border: 1px solid var(--border-medium) !important;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+    
+    .action-button:hover {
+      background-color: var(--bg-hover) !important;
+      transform: translateY(-1px);
+    }
+    
+    .action-button svg {
+      width: 16px;
+      height: 16px;
+      color: var(--text-secondary);
+    }
+    
+    #clearThreadBtn {
+      margin-top: 0.75rem;
+      background-color: rgba(239, 68, 68, 0.2);
+      color: var(--error);
+      font-weight: 500;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    
+    #clearThreadBtn:hover {
+      background-color: rgba(239, 68, 68, 0.3);
+    }
+    
+    #newThreadBtn {
+      background-color: var(--accent-primary);
+      color: white;
+    }
+    
+    #newThreadBtn:hover {
+      background-color: var(--accent-secondary);
+    }
+    
+    /* --------------------------------
+       Message Styles
+    -------------------------------- */
+    .message {
+      position: relative;
+      max-width: 80%;
+      padding: 1rem;
+      border-radius: var(--radius-md);
+      line-height: 1.5;
+      word-wrap: break-word;
+      animation: fadeIn var(--transition-normal);
+      box-shadow: var(--shadow-sm);
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .message.user {
+      float: right;
+      background-color: var(--accent-tertiary);
+      margin-left: 20%;
+      border-top-right-radius: 4px;
+    }
+    
+    .message.bot {
+      float: left;
+      background-color: var(--bg-component);
+      margin-right: 20%;
+      border-top-left-radius: 4px;
+    }
+    
+    .message.bot.placeholder {
+      font-style: italic;
+      color: var(--text-tertiary);
+      background-color: var(--bg-tertiary);
+      animation: pulse 1.5s infinite alternate;
+    }
+    
+    @keyframes pulse {
+      from { opacity: 0.8; }
+      to { opacity: 1; }
+    }
+    
+    .message-timestamp {
+      color: var(--text-tertiary);
+      font-size: 0.8rem;
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+    
+    .message-container {
+      width: 100%;
+      overflow: hidden;
+    }
+    
+    /* Enhanced Thinking Steps */
+    .thinking-steps {
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 15px;
+      margin-bottom: 15px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+    
+    .thinking-label {
+      font-size: 0.7rem;
+      font-family: 'Inter', sans-serif;
+      color: var(--text-tertiary);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-light);
+      padding-bottom: 6px;
+    }
+    
+    .cod-thinking {
+      background-color: rgba(30, 41, 59, 0.5) !important;
+      border-color: rgba(61, 78, 99, 0.5) !important;
+    }
+    
+    /* Chain of Draft Step Styling */
+    .step {
+      border-left: 2px solid var(--accent-tertiary);
+      padding-left: 12px;
+      margin-bottom: 10px;
+      color: var(--text-secondary);
+    }
+    
+    .cod-step {
+      display: flex;
+      align-items: flex-start;
+      padding: 10px 12px;
+      margin-bottom: 12px !important;
+      border-left: none !important;
+      background-color: rgba(44, 59, 79, 0.5);
+      border-radius: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+      transition: transform var(--transition-fast), background-color var(--transition-fast);
+    }
+    
+    .cod-step:hover {
+      background-color: rgba(44, 59, 79, 0.8);
+      transform: translateY(-1px);
+    }
+    
+    .step-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      background-color: rgba(61, 79, 105, 0.8);
+      border-radius: 12px;
+      margin-right: 10px;
+      color: var(--accent-primary);
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    
+    .step-content {
+      flex: 1;
+      padding-right: 8px;
+      font-family: 'Roboto Mono', monospace;
+      color: var(--text-primary);
+      line-height: 1.6;
+    }
+    
+    /* Reflection Step Styling */
+    .reflection-step {
+      background-color: rgba(61, 70, 97, 0.6) !important;
+      border-left: 3px solid #8a5cf7 !important;
+    }
+    
+    .reflection-step .step-number {
+      background-color: rgba(93, 77, 138, 0.8) !important;
+      color: #d4c5ff !important;
+    }
+    
+    .reflection-step .step-content {
+      color: #d4c5ff !important;
+      font-style: italic;
+    }
+    
+    /* Final Answer Styling */
+    .final-answer {
+      background-color: rgba(45, 55, 72, 0.7);
+      border: 1px solid rgba(74, 85, 104, 0.5);
+      border-radius: var(--radius-sm);
+      padding: 15px;
+      margin-top: 15px;
+      color: var(--text-primary);
+      position: relative;
+      clear: both;
+      overflow: hidden;
+    }
+    
+    .final-answer-label {
+      font-size: 0.7rem;
+      color: var(--accent-primary);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: bold;
+      border-bottom: 1px dotted rgba(90, 114, 153, 0.5);
+      padding-bottom: 6px;
+      display: block;
+    }
+    
+    /* Word Count Badge */
+    .word-count-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background-color: rgba(30, 30, 30, 0.8);
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      padding: 4px 10px;
+      border-radius: 12px;
+      border: 1px solid var(--border-light);
+      white-space: nowrap;
+      z-index: 5;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: opacity var(--transition-fast), transform var(--transition-fast);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .web-search-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--accent-primary);
+      font-size: 0.7rem;
+    }
+    
+    .web-search-indicator svg {
+      width: 12px;
+      height: 12px;
+    }
+    
+    .message:hover .word-count-badge {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .word-count-breakdown {
+      font-size: 0.7rem;
+      color: var(--text-tertiary);
+      margin-top: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    
+    .count-item {
+      display: flex;
+      align-items: center;
+    }
+    
+    .count-thinking {
+      color: #b7c9db;
+    }
+    
+    .count-answer {
+      color: #90cdf4;
+    }
+    
+    .token-savings {
+      font-size: 0.7rem;
+      color: var(--success);
+      margin-left: 5px;
+    }
+    
+    /* Message Attachments */
+    .message-file-attachment {
+      margin-top: 12px;
+      padding: 10px;
+      background-color: rgba(42, 42, 42, 0.5);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      transition: background-color var(--transition-fast);
+    }
+    
+    .message-file-attachment:hover {
+      background-color: rgba(42, 42, 42, 0.8);
+    }
+    
+    .message-file-icon {
+      margin-right: 10px;
+      font-size: 1.2rem;
+      color: var(--text-tertiary);
+    }
+    
+    .message-file-info {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .message-file-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    
+    .message-file-size {
+      font-size: 0.7rem;
+      color: var(--text-tertiary);
+    }
+    
+    .message-image {
+      max-width: 100%;
+      border-radius: 6px;
+      margin-top: 12px;
+      cursor: pointer;
+      transition: transform var(--transition-fast);
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .message-image:hover {
+      transform: scale(1.02);
+    }
+    
+    /* --------------------------------
+       Code Block Styles
+    -------------------------------- */
+    pre {
+      background-color: rgba(31, 31, 31, 0.7);
+      padding: 0.75rem;
+      border-radius: var(--radius-sm);
+      overflow-x: auto;
+      margin: 0.75rem 0;
+      position: relative;
+      border: 1px solid var(--border-light);
+    }
+    
+    code {
+      font-family: 'Roboto Mono', monospace;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+    }
+    
+    .code-block-container {
+      position: relative;
+      margin: 0.75rem 0;
+      background-color: rgba(31, 31, 31, 0.7);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
+      padding: 0;
+      border: 1px solid var(--border-light);
+    }
+    
+    .code-block-container pre {
+      margin: 0;
+      border: none;
+      background: transparent;
+    }
+    
+    .copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background-color: rgba(51, 51, 51, 0.8);
+      border: none;
+      color: var(--text-secondary);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      z-index: 2;
+    }
+    
+    .copy-btn:hover {
+      background-color: var(--accent-primary);
+      color: white;
+    }
+
+    /* --------------------------------
+       Modal Styles
+    -------------------------------- */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow-y: auto;
+      background-color: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      animation: fadeIn 0.2s ease;
+    }
+    
+    .modal-content {
+      background-color: var(--bg-secondary);
+      margin: 4% auto;
+      padding: 20px 25px;
+      border: 1px solid var(--border-medium);
+      width: 650px;
+      max-width: 90%;
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      max-height: 85vh;
+      overflow-y: auto;
+      animation: modalSlideIn 0.3s ease;
+    }
+    
+    @keyframes modalSlideIn {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid var(--border-light);
+    }
+    
+    .modal-header h2 {
+      margin: 0;
+      font-size: 1.4rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .modal-content label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    
+    .modal-content input, 
+    .modal-content select, 
+    .modal-content textarea {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 15px;
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    
+    .modal-content input:focus, 
+    .modal-content select:focus,
+    .modal-content textarea:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 2px rgba(86, 134, 245, 0.25);
+    }
+    
+    .modal-content button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 500;
+      transition: all var(--transition-fast);
+    }
+    
+    .modal-content button.primary {
+      background-color: var(--accent-primary);
+      color: white;
+    }
+    
+    .modal-content button.primary:hover {
+      background-color: var(--accent-secondary);
+    }
+    
+    .modal-content button.secondary {
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+      border: 1px solid var(--border-medium);
+    }
+    
+    .modal-content button.secondary:hover {
+      background-color: var(--bg-hover);
+    }
+    
+    .close-modal {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0;
+      margin: 0;
+      transition: color var(--transition-fast);
+    }
+    
+    .close-modal:hover {
+      color: var(--text-primary);
+    }
+    
+    .settings-tabs {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 15px;
+    }
+    
+    .tab-btn {
+      flex: 1;
+      background-color: var(--bg-component);
+      border: 1px solid var(--border-medium);
+      color: var(--text-secondary);
+      padding: 10px 0;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-align: center;
+      font-weight: 500;
+    }
+    
+    .tab-btn.active {
+      background-color: var(--bg-hover);
+      color: var(--text-primary);
+      border-bottom: 2px solid var(--accent-primary);
+    }
+    
+    .tab-content {
+      display: none;
+      padding: 15px;
+      background-color: var(--bg-component);
+      border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+      margin-bottom: 20px;
+      position: relative;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .checkbox-container input[type="checkbox"] {
+      width: auto;
+      margin-right: 10px;
+      margin-bottom: 0;
+    }
+    
+    .tooltip {
+      position: relative;
+      display: inline-block;
+      margin-left: 5px;
+      cursor: help;
+    }
+    
+    .tooltip .tooltiptext {
+      visibility: hidden;
+      width: 300px;
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+      text-align: left;
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      position: absolute;
+      z-index: 1;
+      top: -5px;
+      left: 105%;
+      opacity: 0;
+      transition: opacity var(--transition-fast);
+      box-shadow: var(--shadow-sm);
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+    
+    .tooltip:hover .tooltiptext {
+      visibility: visible;
+      opacity: 1;
+    }
+    
+    .feature-section {
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      margin-bottom: 16px;
+      background-color: var(--bg-component);
+    }
+    
+    .feature-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .feature-header input[type="checkbox"] {
+      margin-right: 8px;
+    }
+    
+    .feature-header label {
+      font-weight: 500;
+      font-size: 1rem;
+      color: var(--text-primary);
+    }
+    
+    .feature-options {
+      margin-left: 24px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border-light);
+    }
+    
+    .option-label {
+      margin-bottom: 8px;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    
+    .radio-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    
+    .radio-option {
+      display: flex;
+      align-items: center;
+    }
+    
+    .radio-option input[type="radio"] {
+      margin-right: 8px;
+      width: auto;
+      cursor: pointer;
+    }
+    
+    .radio-option label {
+      cursor: pointer;
+      margin-bottom: 0;
+    }
+    
+    input[type="radio"] {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      border-radius: 50%;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border-medium);
+      outline: none;
+      margin-right: 8px;
+      position: relative;
+      cursor: pointer;
+    }
+    
+    input[type="radio"]:checked {
+      border-color: var(--accent-primary);
+    }
+    
+    input[type="radio"]:checked:before {
+      content: '';
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+    }
+    
+    input[type="checkbox"] {
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border-medium);
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+      position: relative;
+    }
+    
+    input[type="checkbox"]:checked {
+      border-color: var(--accent-primary);
+      background-color: var(--accent-primary);
+    }
+    
+    input[type="checkbox"]:checked:before {
+      content: '✓';
+      position: absolute;
+      color: white;
+      font-size: 12px;
+      top: -1px;
+      left: 2px;
+    }
+    
+    .tooltip {
+      margin-left: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      background-color: var(--border-medium);
+      border-radius: 50%;
+      font-size: 12px;
+      cursor: help;
+    }
+    
+    .status-notification {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+      padding: 10px 15px;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      z-index: 1001;
+      display: none;
+      opacity: 0;
+      transition: opacity var(--transition-fast);
+    }
+    
+    .status-notification.show {
+      display: block;
+      opacity: 1;
+    }
+    
+    .close-modal {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 20px;
+      cursor: pointer;
+      padding: 0;
+      margin: 0;
+      transition: color var(--transition-fast);
+    }
+    
+    .close-modal:hover {
+      color: var(--text-primary);
+    }
+    
+    .current-model-display {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-size: 0.9rem;
+      margin-left: 10px;
+    }
+    
+    .reasoning-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      margin-left: 5px;
+      background-color: var(--border-medium);
+    }
+    
+    .settings-row {
+      display: flex;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+    
+    .settings-column {
+      flex: 1;
+    }
+    
+    .prompt-editor {
+      margin-top: 15px;
+    }
+    
+    .prompt-editor textarea {
+      width: 100%;
+      min-height: 150px;
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: monospace;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      resize: vertical;
+    }
+    
+    .prompt-reset {
+      margin-top: 5px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    
+    .prompt-reset:hover {
+      color: var(--accent-primary);
+    }
+    
+    .cod-thinking {
+      background-color: rgba(30, 41, 59, 0.5) !important;
+      border-color: rgba(61, 78, 99, 0.5) !important;
+    }
+    
+    .cod-step {
+      display: flex;
+      align-items: flex-start;
+      padding: 6px 8px;
+      margin-bottom: 10px !important;
+      border-left: none !important;
+      background-color: rgba(44, 59, 79, 0.5);
+      border-radius: 6px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    
+    .step-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      background-color: rgba(61, 79, 105, 0.8);
+      border-radius: 12px;
+      margin-right: 10px;
+      color: var(--accent-primary);
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    
+    .step-content {
+      flex: 1;
+      padding-right: 8px;
+      font-family: 'Roboto Mono', monospace;
+      color: var(--text-primary);
+    }
+    
+    .token-savings {
+      font-size: 0.7rem;
+      color: var(--success);
+      margin-left: 5px;
+    }
+    
+    .cod-options {
+      margin-top: 15px;
+      display: none;
+    }
+    
+    .cod-word-limit-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+    
+    .cod-word-limit-option {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      background-color: var(--bg-component);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color var(--transition-fast);
+    }
+    
+    .cod-word-limit-option:hover {
+      background-color: var(--bg-hover);
+    }
+    
+    .cod-word-limit-option.selected {
+      background-color: var(--bg-hover);
+      border-left: 3px solid var(--accent-primary);
+    }
+    
+    .cod-word-limit-value {
+      font-weight: bold;
+      margin-right: 5px;
+    }
+    
+    .cod-word-limit-desc {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    
+    .cod-examples {
+      margin-top: 15px;
+      padding: 15px;
+      background-color: var(--bg-component);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-medium);
+    }
+    
+    .cod-examples-header {
+      font-size: 0.9rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border-light);
+      padding-bottom: 5px;
+    }
+    
+    .cod-example-item {
+      margin-bottom: 12px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.85rem;
+      padding: 8px;
+      background-color: var(--bg-hover);
+      border-radius: 5px;
+      color: var(--text-secondary);
+    }
+    
+    .cod-example-question {
+      color: var(--text-tertiary);
+      margin-bottom: 5px;
+    }
+    
+    .cod-example-answer {
+      color: var(--accent-primary);
+    }
+    
+    .word-count-breakdown {
+      font-size: 0.7rem;
+      color: var(--text-tertiary);
+      margin-top: 3px;
+      display: flex;
+      gap: 8px;
+    }
+    
+    .count-item {
+      display: flex;
+      align-items: center;
+    }
+    
+    .count-thinking {
+      color: #b7c9db;
+    }
+    
+    .count-answer {
+      color: #90cdf4;
+    }
+    
+    .advanced-options-header {
+      font-size: 0.95rem;
+      font-weight: 500;
+      margin: 15px 0 8px 0;
+      color: var(--text-primary);
+      border-bottom: 1px solid var(--border-light);
+      padding-bottom: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 22px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--border-medium);
+      transition: .4s;
+      border-radius: 22px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+      background-color: var(--accent-primary);
+    }
+    
+    input:checked + .toggle-slider:before {
+      transform: translateX(22px);
+    }
+    
+    .enhanced-reasoning {
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      margin-top: 10px;
+    }
+    
+    .enhanced-reasoning-option {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    
+    .enhanced-reasoning-option input[type="radio"] {
+      margin-right: 10px;
+    }
+    
+    .option-description {
+      margin-left: 25px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+    
+    .complexity-indicator {
+      display: flex;
+      margin-top: 15px;
+      margin-bottom: 10px;
+    }
+    
+    .complexity-level {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+    }
+    
+    .complexity-bar {
+      height: 5px;
+      background-color: var(--border-medium);
+      margin-top: 5px;
+      border-radius: 2px;
+      width: 100%;
+    }
+    
+    .complexity-label {
+      font-size: 0.75rem;
+      color: var(--accent-primary);
+    }
+    
+    .preset-type {
+      display: inline-block;
+      padding: 3px 8px;
+      background-color: var(--bg-hover);
+      color: var(--accent-primary);
+      border-radius: 12px;
+      font-size: 0.7rem;
+      margin-left: 8px;
+    }
+    
+    .auto-detection-badge {
+      display: inline-flex;
+      align-items: center;
+      background-color: var(--bg-hover);
+      color: var(--accent-primary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      margin-left: 7px;
+    }
+    
+    .auto-detection-badge .indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: var(--success);
+      border-radius: 50%;
+      margin-right: 4px;
+    }
+    
+    .problem-analyzer {
+      margin-top: 15px;
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    
+    .analyzer-title {
+      font-weight: 500;
+      color: var(--accent-primary);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+    }
+    
+    .analyzer-icon {
+      margin-right: 6px;
+      color: var(--success);
+    }
+    
+    .analyzer-help {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    
+    @media (max-width: 768px) {
+      .app-container {
+        flex-direction: column;
+      }
+      
+      .sidebar {
+        width: 100%;
+        max-height: 200px;
+      }
+      
+      .message {
+        max-width: 85%;
+      }
+      
+      .settings-row {
+        flex-direction: column;
+        gap: 10px;
+      }
+    }
+    
+    .file-upload-button {
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 0.3rem 0.6rem;
+      margin-right: 0.5rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      transition: background-color var(--transition-fast);
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .file-upload-button:hover {
+      background-color: var(--bg-hover);
+    }
+    
+    .file-upload-icon {
+      margin-right: 5px;
+    }
+    
+    .file-input {
+      display: none;
+    }
+    
+    .attached-files {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px;
+      border-top: 1px solid var(--border-light);
+      background-color: var(--bg-secondary);
+    }
+    
+    .file-preview {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background-color: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      max-width: 100px;
+    }
+    
+    .file-preview-image {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+    
+    .file-preview-icon {
+      width: 80px;
+      height: 80px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      color: var(--text-secondary);
+      background-color: var(--bg-component);
+      border-radius: 6px;
+    }
+    
+    .file-preview-name {
+      margin-top: 5px;
+      font-size: 0.7rem;
+      text-align: center;
+      width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: var(--text-secondary);
+    }
+    
+    .file-preview-remove {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background-color: rgba(0, 0, 0, 0.6);
+      color: var(--text-primary);
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .message-file-attachment {
+      margin-top: 10px;
+      padding: 10px;
+      background-color: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+    }
+    
+    .message-file-icon {
+      margin-right: 10px;
+      font-size: 1.2rem;
+      color: var(--text-secondary);
+    }
+    
+    .message-file-info {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .message-file-name {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+    
+    .message-file-size {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+    
+    .message-image {
+      max-width: 100%;
+      border-radius: 6px;
+      margin-top: 10px;
+      cursor: pointer;
+      transition: transform var(--transition-fast);
+    }
+    
+    .message-image:hover {
+      transform: scale(1.01);
+    }
+    
+    .reflection-step {
+      background-color: rgba(61, 70, 97, 0.6) !important;
+      border-left: 3px solid #8a5cf7 !important;
+    }
+    
+    .reflection-step .step-number {
+      background-color: rgba(93, 77, 138, 0.8) !important;
+      color: #d4c5ff !important;
+    }
+    
+    .reflection-step .step-content {
+      color: #d4c5ff !important;
+      font-style: italic;
+    }
+    
+    .range-container {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    
+    .range-value {
+      position: absolute;
+      right: 0;
+      top: 0;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+    }
+    
+    #sendBtn, #clearThreadBtn {
+      background-color: var(--accent-primary);
+      color: white;
+      padding: 8px 15px;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 500;
+      transition: background-color var(--transition-fast);
+    }
+    
+    #sendBtn:hover, #clearThreadBtn:hover {
+      background-color: var(--accent-secondary);
+    }
+    
+    #clearThreadBtn {
+      background-color: var(--error);
+      width: 100%;
+      margin-top: 10px;
+    }
+    
+    #clearThreadBtn:hover {
+      background-color: #bd2130;
+    }
+
+    /* Feedback Button Styling */
+    #openFeedbackBtn {
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-medium);
+      width: 100%;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 0.75rem;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all var(--transition-fast);
+    }
+
+    #openFeedbackBtn:hover {
+      background-color: var(--bg-hover);
+      transform: translateY(-1px);
+    }
+
+    /* Modal Content Styling */
+    .modal-content {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
+      border: 1px solid var(--border-medium);
+    }
+
+    /* Tab Button Styling */
+    .tab-btn {
+      border-radius: 6px;
+      font-weight: 500;
+      padding: 10px 15px;
+    }
+
+    .tab-btn.active {
+      background-color: var(--accent-primary);
+      box-shadow: none;
+    }
+
+    /* Feedback Form Styling */
+    #feedbackModal textarea {
+      width: 100%;
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+      border: 1px solid var(--border-medium);
+      border-radius: 5px;
+      padding: 10px;
+      margin-bottom: 20px;
+    }
+
+    #feedbackModal button[type="submit"] {
+      background-color: var(--accent-primary);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 5px;
+      cursor: pointer;
+      float: right;
+    }
+
+    #feedbackModal button[type="submit"]:hover {
+      background-color: var(--accent-secondary);
+    }
+
+    /* Enhanced Model Dropdown Styling */
+    .model-select-container {
+      position: relative;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+
+    #modelSelect {
+      width: 100%;
+      padding: 12px 15px;
+      font-size: 0.95rem;
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      appearance: none;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      box-shadow: var(--shadow-sm);
+    }
+
+    #modelSelect:hover {
+      background-color: var(--bg-hover);
+      border-color: var(--accent-primary);
+    }
+
+    #modelSelect:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 2px rgba(86, 134, 245, 0.25);
+    }
+
+    .model-select-container::after {
+      content: '▼';
+      position: absolute;
+      right: 15px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-secondary);
+      pointer-events: none;
+      font-size: 0.8rem;
+      transition: transform var(--transition-fast);
+    }
+
+    .model-select-container:hover::after {
+      color: var(--text-primary);
+    }
+
+    /* Model Info Card Enhancement */
+    .model-info-card {
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 15px;
+      margin-top: 15px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .model-info-header {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .model-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .model-tag {
+      background-color: var(--bg-hover);
+      color: var(--accent-primary);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .model-description {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    /* Settings Modal Enhancement */
+    .modal-content {
+      background-color: var(--bg-secondary);
+      margin: 2% auto;
+      padding: 25px 30px;
+      border: 1px solid var(--border-medium);
+      width: 700px;
+      max-width: 95%;
+      border-radius: var(--radius-lg);
+      color: var(--text-primary);
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .settings-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 25px;
+      background: var(--bg-tertiary);
+      padding: 8px;
+      border-radius: var(--radius-md);
+    }
+
+    .tab-btn {
+      flex: 1;
+      background-color: transparent;
+      border: none;
+      color: var(--text-secondary);
+      padding: 12px 20px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      font-weight: 500;
+      font-size: 0.95rem;
+    }
+
+    .tab-btn:hover {
+      background-color: var(--bg-hover);
+      color: var(--text-primary);
+    }
+
+    .tab-btn.active {
+      background-color: var(--accent-primary);
+      color: white;
+    }
+
+    .settings-section-header {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border-medium);
+    }
+
+    /* Model Selection Enhancement */
+    .model-select-container {
+      background: var(--bg-tertiary);
+      padding: 20px;
+      border-radius: var(--radius-md);
+      margin-bottom: 25px;
+    }
+
+    #modelSelect {
+      width: 100%;
+      padding: 15px;
+      font-size: 1rem;
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      appearance: none;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 15px;
+    }
+
+    #modelSelect:hover {
+      background-color: var(--bg-hover);
+      border-color: var(--accent-primary);
+    }
+
+    #modelSelect:focus {
+      outline: none;
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 2px rgba(86, 134, 245, 0.25);
+    }
+
+    .model-info-card {
+      background-color: var(--bg-component);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .model-info-header {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 15px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    .model-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+
+    .model-tag {
+      background-color: var(--bg-hover);
+      color: var(--accent-primary);
+      padding: 6px 12px;
+      border-radius: 15px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    #setModelBtn {
+      background-color: var(--accent-primary);
+      color: white;
+      padding: 12px 24px;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.95rem;
+      margin-top: 20px;
+      transition: all var(--transition-fast);
+    }
+
+    #setModelBtn:hover {
+      background-color: var(--accent-secondary);
+      transform: translateY(-1px);
+    }
+
+    #setModelBtn.success {
+      background-color: var(--success);
+    }
+
+    /* Save/Cancel Buttons Enhancement */
+    .settings-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border-light);
+    }
+
+    #saveSettings, #closeSettings {
+      padding: 12px 24px;
+      border-radius: var(--radius-sm);
+      font-weight: 500;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    #saveSettings {
+      background-color: var(--accent-primary);
+      color: white;
+      border: none;
+    }
+
+    #saveSettings:hover {
+      background-color: var(--accent-secondary);
+      transform: translateY(-1px);
+    }
+
+    #closeSettings {
+      background-color: var(--bg-component);
+      color: var(--text-primary);
+      border: 1px solid var(--border-medium);
+    }
+
+    #closeSettings:hover {
+      background-color: var(--bg-hover);
+      transform: translateY(-1px);
+    }
+
+    /* Enhanced Reasoning Settings */
+    .reasoning-method-container {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-bottom: 25px;
+    }
+
+    .reasoning-option {
+      background: var(--bg-component);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .reasoning-option:hover {
+      background: var(--bg-hover);
+      transform: translateY(-1px);
+      border-color: var(--accent-primary);
+    }
+
+    .reasoning-option.selected {
+      background: rgba(86, 134, 245, 0.1);
+      border-color: var(--accent-primary);
+    }
+
+    .reasoning-option input[type="radio"] {
+      width: 18px;
+      height: 18px;
+      margin: 0;
+    }
+
+    .reasoning-option-content {
+      flex: 1;
+    }
+
+    .reasoning-option-title {
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      font-size: 0.95rem;
+    }
+
+    .reasoning-option-description {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+
+    .reasoning-help-icon {
+      color: var(--text-tertiary);
+      font-size: 1.1rem;
+      padding: 4px;
+      border-radius: 50%;
+      transition: all var(--transition-fast);
+    }
+
+    .reasoning-help-icon:hover {
+      color: var(--accent-primary);
+      background: var(--bg-hover);
+    }
+
+    /* Advanced Options Enhancement */
+    .advanced-options-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 25px 0 15px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid var(--border-medium);
+    }
+
+    .advanced-options-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 46px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--bg-component);
+      transition: .4s;
+      border-radius: 24px;
+      border: 1px solid var(--border-medium);
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 2px;
+      background-color: var(--text-secondary);
+      transition: .4s;
+      border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: var(--accent-primary);
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(21px);
+      background-color: white;
+    }
+
+    /* Problem Analyzer Enhancement */
+    .problem-analyzer {
+      background: var(--bg-component);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-top: 15px;
+    }
+
+    .analyzer-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent-primary);
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+
+    .analyzer-icon {
+      background: rgba(86, 134, 245, 0.1);
+      padding: 6px;
+      border-radius: 8px;
+    }
+
+    .analyzer-help {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .analyzer-help ul {
+      margin-top: 10px;
+      padding-left: 20px;
+    }
+
+    .analyzer-help li {
+      margin-bottom: 6px;
+      color: var(--text-secondary);
+    }
+
+    .web-search-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 20px 0;
+      padding: 12px;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-md);
+    }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .toggle-text {
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    #webSearchToggle {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="blue-light-blocker-overlay" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 2147483647; pointer-events: none; transition: opacity 0.3s; mix-blend-mode: multiply; background-color: rgb(255, 175, 50); opacity: 0; --darkreader-inline-bgcolor: var(--darkreader-background-ffaf32, #ae6a00);" data-darkreader-inline-bgcolor=""></div><!-- Include jsPDF for PDF generation -->
+  <script src="./LLM Playground (COT vs COD)_files/jspdf.umd.min.js"></script>
+
+  <div class="app-container">
+    <!-- Sidebar for Thread Management -->
+    <div class="sidebar">
+      <h2>Threads</h2>
+      <ul id="threadList"><li class="active">Thread 1</li></ul>
+      <div class="sidebar-buttons">
+        <button id="newThreadBtn">New Thread</button>
+        <button id="deleteThreadBtn">Delete Thread</button>
+        <button id="downloadTxtBtn">Download TXT</button>
+        <button id="downloadPdfBtn">Download PDF</button>
+        <button id="clearThreadBtn">Clear Thread</button>
+        <button id="openFeedbackBtn">
+          <span>💬</span>
+          Feedback
+        </button>
+      </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="chat-container">
+      <div class="chat-header">
+        <h1 id="pageTitle">LLM Playground (COT vs COD)</h1>
+        <div class="chat-header-actions">
+          <span id="currentModelDisplay" class="current-model-display">llama-3.3-70b<span class="reasoning-badge" style="background-color: #2d5038; margin-left: 3px;">Adaptive</span></span>
+          <button class="settings-btn" id="openSettings">Settings ⚙️</button>
+        </div>
+      </div>
+      <div class="chat-messages" id="chatMessages"></div>
+      <!-- Chat Input Area -->
+      <div class="chat-input-container">
+        <div class="chat-input">
+          <textarea id="userInput" placeholder="Type your message..." rows="1"></textarea>
+          <div class="chat-input-buttons">
+            <button id="sendBtn" type="button">Send</button>
+            <label for="fileInput" class="action-button" title="Attach files">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+              </svg>
+            </label>
+            <button id="webSearchBtn" class="action-button" type="button" title="Toggle web search">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <input type="file" id="fileInput" class="file-input" multiple>
+        <div id="attachedFiles" class="attached-files" style="display: none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status Notification -->
+  <div id="statusNotification" class="status-notification">TXT file downloaded</div>
+
+  <!-- Settings Modal -->
+<div id="settingsModal" class="modal" style="display: none;">
+  <div class="modal-content">
+    <button class="close-modal" id="closeModalX">×</button>
+    <h2>Settings</h2>
+    
+    <div class="settings-tabs">
+      <button class="tab-btn" data-tab="modelTab">Model</button>
+      <button class="tab-btn" data-tab="reasoningTab">Reasoning</button>
+      <button class="tab-btn active" data-tab="parametersTab">Parameters</button>
+    </div>
+    
+    <!-- Model Selection Tab -->
+    <div id="modelTab" class="tab-content" style="display: none;">
+      <div class="settings-section-header">Model Selection</div>
+
+      <label for="modelSelect">Select DeepSeek Model</label>
+      <div class="model-select-container">
+        <select id="modelSelect" class="model-dropdown">
+          <option value="" disabled selected>Choose a model...</option>
+          <option value="deepseek-chat">DeepSeek Chat V3</option>
+          <option value="deepseek-reasoner">DeepSeek R1 (Reasoner)</option>
+        </select>
+        <div class="dropdown-arrow">▼</div>
+      </div>
+
+      <div class="model-info-card" id="modelInfoCard" style="display: block;">
+        <div class="model-info-header">
+          <span id="selectedModelName">DeepSeek Chat V3</span>
+        </div>
+        <div class="model-info-body">
+          <div class="model-tags" id="modelTags"></div>
+          <div class="model-description" id="modelDescription"></div>
+        </div>
+      </div>
+
+      <button id="setModelBtn">Set Model</button>
+    </div>
+    
+    <!-- Reasoning Tab -->
+    <div id="reasoningTab" class="tab-content" style="display: none;">
+      <div class="settings-section-header">Reasoning Method</div>
+      <div class="feature-section">
+        <div class="radio-options">
+          <div class="radio-option">
+            <input type="radio" id="standardReasoning" name="reasoningMethod" value="standard">
+            <label for="standardReasoning">Standard (No special prompt)</label>
+            <div class="tooltip">?
+              <span class="tooltiptext">Default model behavior with no special reasoning instructions.</span>
+            </div>
+          </div>
+          
+          <div class="radio-option">
+            <input type="radio" id="cotReasoning" name="reasoningMethod" value="cot">
+            <label for="cotReasoning">Chain of Thought (CoT)</label>
+            <div class="tooltip">?
+              <span class="tooltiptext">Instructs the model to think step-by-step to solve problems. Improves reasoning but uses more tokens.</span>
+            </div>
+          </div>
+          
+          <div class="radio-option">
+            <input type="radio" id="codReasoning" name="reasoningMethod" value="cod" checked>
+            <label for="codReasoning">Chain of Draft (CoD)</label>
+            <div class="tooltip">?
+              <span class="tooltiptext">Uses minimal words per step (research paper approach) to reduce token usage while maintaining reasoning quality.</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- COD Word Limit options -->
+        <div id="codOptions" class="cod-options" style="display: none;">
+          <div class="option-label">Word limit per step:</div>
+          <div class="cod-word-limit-options">
+            <div class="cod-word-limit-option" data-value="5">
+              <span class="cod-word-limit-value">5 words</span>
+              <span class="cod-word-limit-desc">Original paper recommendation</span>
+            </div>
+            <div class="cod-word-limit-option" data-value="10">
+              <span class="cod-word-limit-value">10 words</span>
+              <span class="cod-word-limit-desc">Balanced brevity and clarity</span>
+            </div>
+            <div class="cod-word-limit-option" data-value="15">
+              <span class="cod-word-limit-value">15 words</span>
+              <span class="cod-word-limit-desc">More descriptive steps</span>
+            </div>
+            <div class="cod-word-limit-option" data-value="17">
+              <span class="cod-word-limit-value">17 words</span>
+              <span class="cod-word-limit-desc">Better for complex reasoning</span>
+            </div>
+            <div class="cod-word-limit-option selected" data-value="20">
+              <span class="cod-word-limit-value">20 words</span>
+              <span class="cod-word-limit-desc">Detailed steps for math & logic</span>
+            </div>
+          </div>
+          
+          <div class="cod-examples">
+            <div class="cod-examples-header">Chain of Draft Example</div>
+            <div class="cod-example-item">
+              <div class="cod-example-question">Q: If a fabric store received 45 yards of cotton and used 2/9 of it, how many yards remain?</div>
+              <div class="cod-example-answer">A: Total: 45 yards. Used: 2/9 × 45 = 10 yards. Remaining: 45 - 10 = 35 yards. #### 35 yards</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- NEW: Enhanced Reasoning Controls -->
+      <div class="advanced-options-header">
+        Advanced Reasoning Options
+        <label class="toggle-switch">
+          <input type="checkbox" id="enhancedReasoningToggle" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      
+      <div id="enhancedReasoningOptions" class="enhanced-reasoning">
+        <div class="enhanced-reasoning-option">
+          <input type="radio" id="adaptiveReasoning" name="reasoningEnhancement" value="adaptive" checked>
+          <label for="adaptiveReasoning">Adaptive Reasoning</label>
+          <span class="auto-detection-badge"><span class="indicator"></span>Auto</span>
+        </div>
+        <div class="option-description">
+          Automatically increases reasoning depth for complex problems (math, logic, multi-step reasoning).
+        </div>
+        
+        <div class="enhanced-reasoning-option">
+          <input type="radio" id="standardReasoningEnhancement" name="reasoningEnhancement" value="standard">
+          <label for="standardReasoningEnhancement">Fixed Reasoning Depth</label>
+        </div>
+        <div class="option-description">
+          Uses the same reasoning approach for all problems regardless of complexity.
+        </div>
+        
+        <div class="problem-analyzer">
+          <div class="analyzer-title">
+            <span class="analyzer-icon">🔍</span> Problem Complexity Detection
+          </div>
+          <div class="analyzer-help">
+            When adaptive reasoning is enabled, the system will automatically analyze your questions to detect:
+            <ul style="margin-top: 5px; padding-left: 20px; font-size: 0.85rem;">
+              <li>Mathematical expressions and calculations</li>
+              <li>Multi-step reasoning requirements</li>
+              <li>Logical dependencies and constraints</li>
+              <li>Complex or abstract concepts</li>
+            </ul>
+            For complex problems, the model will use more detailed reasoning steps even with CoD.
+          </div>
+        </div>
+      </div>
+
+      <!-- Replace Self-Consistency Section with Self-Reflection -->
+      <div class="advanced-options-header">
+        Self-Reflection for Chain of Draft
+        <label class="toggle-switch">
+          <input type="checkbox" id="selfReflectionToggle" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div id="selfReflectionInfo" class="enhanced-reasoning">
+        <div class="option-description">
+          Adds a reflection step after reasoning to help the model verify its own work and catch mistakes.
+        </div>
+        
+        <div class="problem-analyzer">
+          <div class="analyzer-title">
+            <span class="analyzer-icon">🔍</span> How Self-Reflection Works
+          </div>
+          <div class="analyzer-help">
+            When using Chain of Draft with self-reflection:
+            <ul style="margin-top: 5px; padding-left: 20px; font-size: 0.85rem;">
+              <li>The model reasons step-by-step as usual</li>
+              <li>Before concluding, it adds a reflection step to check for errors</li>
+              <li>This helps identify calculation mistakes, misunderstandings, or logic errors</li>
+              <li>The reflection is highlighted in the UI for easy identification</li>
+            </ul>
+            This approach improves accuracy with a single API call, unlike self-consistency which required multiple calls.
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Parameters Tab -->
+    <div id="parametersTab" class="tab-content active">
+      <div class="settings-section-header">Generation Parameters</div>
+      
+      <label for="temp">Temperature</label>
+      <div class="range-container">
+        <input type="range" id="temp" min="0" max="1" step="0.01" value="0.5">
+        <span id="tempValue" class="range-value">0.5</span>
+      </div>
+      <p style="font-size: 0.8rem; color: #aaa; margin-top: 0;">Controls randomness: lower values make responses more focused.</p>
+
+      <label for="topP">Top P</label>
+      <div class="range-container">
+        <input type="range" id="topP" min="0" max="1" step="0.01" value="0.90">
+        <span id="topPValue" class="range-value">0.9</span>
+      </div>
+      <p style="font-size: 0.8rem; color: #aaa; margin-top: 0;">Controls diversity via nucleus sampling.</p>
+
+      <label for="maxTokens">Max Tokens</label>
+      <div class="range-container">
+        <input type="range" id="maxTokens" min="256" max="128000" step="128" value="4096">
+        <span id="maxTokensValue" class="range-value">4096</span>
+      </div>
+      <p style="font-size: 0.8rem; color: #aaa; margin-top: 0;">Maximum length of the response (up to 128k tokens).</p>
+    </div>
+    
+    <div style="text-align: right; margin-top: 20px;">
+      <button id="saveSettings">Save</button>
+      <button id="closeSettings">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Feedback Modal -->
+<div id="feedbackModal" class="modal" style="display: none;">
+  <div class="modal-content" style="max-width: 500px;">
+    <button class="close-modal" id="closeFeedbackModal">×</button>
+    <h2>Share Your Feedback</h2>
+    
+    <form method="POST" name="feedback" data-netlify="true">
+      <input type="hidden" name="form-name" value="feedback">
+      <input type="hidden" id="feedbackModel" name="model" value="qwen-2.5-coder">
+      <input type="hidden" id="feedbackReasoning" name="reasoning_method" value="COD-20">
+      
+      <label for="feedbackType">Feedback Type:</label>
+      <select id="feedbackType" name="feedback_type" style="width: 100%; margin-bottom: 15px;">
+        <option value="general">General Feedback</option>
+        <option value="bug">Report a Bug</option>
+        <option value="feature">Feature Request</option>
+        <option value="model_performance">Model Performance</option>
+      </select>
+      
+      <label>How would you rate your experience?</label>
+      <div style="display: flex; justify-content: space-between; margin: 10px 0 15px 0;">
+        <label style="flex: 1; text-align: center;">
+          <input type="radio" name="rating" value="1" required>
+          <div>😞</div>
+          <div style="font-size: 0.8rem;">Poor</div>
+        </label>
+        <label style="flex: 1; text-align: center;">
+          <input type="radio" name="rating" value="2">
+          <div>😐</div>
+          <div style="font-size: 0.8rem;">Fair</div>
+        </label>
+        <label style="flex: 1; text-align: center;">
+          <input type="radio" name="rating" value="3">
+          <div>🙂</div>
+          <div style="font-size: 0.8rem;">Good</div>
+        </label>
+        <label style="flex: 1; text-align: center;">
+          <input type="radio" name="rating" value="4">
+          <div>😀</div>
+          <div style="font-size: 0.8rem;">Great</div>
+        </label>
+        <label style="flex: 1; text-align: center;">
+          <input type="radio" name="rating" value="5">
+          <div>🤩</div>
+          <div style="font-size: 0.8rem;">Excellent</div>
+        </label>
+      </div>
+      
+      <label for="feedbackComments">Comments:</label>
+      <textarea id="feedbackComments" name="comments" rows="4" required></textarea>
+      
+      <button type="submit">Submit Feedback</button>
+    </form>
+  </div>
+</div>
+
+<script>
+    /***********************
+     * Global Configuration
+     ***********************/
+    let MODEL_NAME = "";
+    let MODEL_NAME_DISPLAY = "";
+    let enableWebSearch = false; // Add web search global variable
+    
+    // Server endpoint (Netlify serverless function)
+    const API_PROXY_URL = "/.netlify/functions/api-proxy";
+    
+    // Reasoning Method
+    let REASONING_METHOD = "cod"; // Options: "standard", "cot", "cod"
+    
+    // COD Word Limit
+    let COD_WORD_LIMIT = 5;
+    
+    // NEW: Enhanced reasoning controls
+    let ENHANCED_REASONING_ENABLED = true;
+    let REASONING_ENHANCEMENT = "adaptive"; // Options: "adaptive", "standard"
+    
+    // NEW: Problem complexity detection
+    let PROBLEM_COMPLEXITY = {
+      hasMath: false,
+      hasLogic: false,
+      multiStep: false,
+      complexity: "normal" // Options: "simple", "normal", "complex"
+    };
+    
+    // Prompts for different reasoning methods
+    let PROMPTS = {
+      standard: "",
+      
+      cot: `Think step by step to solve this problem. Explain your reasoning at each step, then provide your final answer.`,
+      
+      cod: `Think step by step, but produce only minimal notes for each step (${COD_WORD_LIMIT} words maximum per step). Use mathematical notation where possible. Keep only essential information needed to solve the problem. Focus on key calculations and intermediate results without narrative explanation.
+  
+Separate your steps with periods. Write your final answer after the #### separator.
+
+Examples:
+Q: Jason had 20 lollipops. He gave Denny some lollipops. Now Jason has 12 lollipops. How many lollipops did Jason give to Denny?
+A: 20 initial. 12 remaining. 20 - 12 = 8. #### 8 lollipops
+
+Q: Roger has $125. He spends $55 on a video game and then receives $25 for his birthday. How much money does Roger have now?
+A: Start: $125. Spent: $55. 125 - 55 = $70. Received: $25. 70 + 25 = $95. #### $95
+
+Q: A square has a perimeter of 20 cm. What is its area?
+A: Perimeter = 20 cm. Side length = 20/4 = 5 cm. Area = 5² = 25 cm². #### 25 square centimeters
+
+Q: If a fabric store received 45 yards of cotton material and used 2/9 of it for a bulk order, how many yards of cotton material does the fabric store have left?
+A: Total: 45 yards. Used: 2/9 × 45 = 10 yards. Remaining: 45 - 10 = 35 yards. #### 35 yards
+
+Q: The temperature on Monday was -3°C. On Tuesday, it was 14°C. What was the change in temperature from Monday to Tuesday?
+A: Monday: -3°C. Tuesday: 14°C. Change: 14 - (-3) = 17°C. #### 17°C`
+    };
+    
+    // NEW: Enhanced prompts for complex problems with different word limits
+    let ENHANCED_PROMPTS = {
+      cot: `Think step by step to solve this problem. This appears to be a complex problem that requires careful reasoning. Break down your thinking into clear steps, making sure to consider all relevant information and constraints. 
+
+For complex problems, use as many steps as needed to work through the solution thoroughly. It's better to use more steps with clear reasoning than to skip steps.
+
+Check your calculations and logic at each step. After you've completed your reasoning process, provide your final answer.`,
+      
+      cod5: `Think step by step to solve this complex problem. For each step, use at most 5 words to capture the essential reasoning, but use AS MANY STEPS as needed to thoroughly work through the problem. Use mathematical notation where efficient. Show ALL intermediate calculations and logical inferences.
+
+IMPORTANT: Instead of trying to fit complex reasoning into fewer steps, break your reasoning into more numerous simple steps. For example, instead of one step with "Calculate area using length×width=50×30=1500", use multiple steps:
+1. Length = 50.
+2. Width = 30.
+3. Area = length × width.
+4. Area = 50 × 30.
+5. Area = 1500.
+
+Separate your steps with periods. Write your final answer after the #### separator.
+
+Example of solving a complex problem with sufficient steps:
+Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
+A: First segment: speed 60 mph. First segment: time 2h. First segment: distance = 60 × 2. First segment: distance = 120 miles. Second segment: speed 75 mph. Second segment: time 1h. Second segment: distance = 75 × 1. Second segment: distance = 75 miles. Third segment: speed 50 mph. Third segment: time 0.5h. Third segment: distance = 50 × 0.5. Third segment: distance = 25 miles. Total distance: 120 + 75 + 25. Total distance = 220 miles. #### 220 miles`,
+
+      cod10: `Think step by step to solve this complex problem. For each step, use up to 10 words to capture the essential reasoning. Use AS MANY STEPS as needed to fully solve the problem. Include ALL intermediate calculations and logical inferences.
+
+IMPORTANT: For complex problems, it's better to use more steps with clear reasoning than to try cramming too much into each step. Break complex calculations into multiple steps.
+
+When thinking through difficult parts of a problem:
+1. Identify what information you need
+2. Think about how to derive that information
+3. Perform calculations systematically
+4. Check your work at key points
+
+Separate your steps with periods. Write your final answer after the #### separator.
+
+Example of solving a complex problem:
+Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
+A: First segment: speed 60 mph for 2 hours. First segment distance calculation: 60 mph × 2h. First segment distance = 120 miles. Second segment: speed 75 mph for 1 hour. Second segment distance calculation: 75 mph × 1h. Second segment distance = 75 miles. Third segment: speed 50 mph for 0.5 hours. Third segment distance calculation: 50 mph × 0.5h. Third segment distance = 25 miles. Need to sum all segment distances. Total distance calculation: 120 + 75 + 25. Total distance traveled = 220 miles. #### 220 miles`,
+      
+      cod15: `Think step by step to solve this complex problem. For each step, use up to 15 words to capture the essential reasoning, providing more detail for critical steps. Use mathematical notation where helpful but include explanations of your approach at key points.
+
+Separate your steps with periods. Write your final answer after the #### separator.
+
+Example of solving a complex problem:
+Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
+A: First segment: The car travels at 60 mph for 2 hours, so distance = 60 × 2 = 120 miles. Second segment: The car increases to 75 mph for 1 hour, so distance = 75 × 1 = 75 miles. Third segment: The car decreases to 50 mph for 0.5 hours, so distance = 50 × 0.5 = 25 miles. Total distance traveled = 120 + 75 + 25 = 220 miles. #### 220 miles`,
+      
+      cod17: `Think step by step to solve this complex problem. For each step, use up to 17 words to provide clear reasoning, especially for difficult parts. Balance precision and concision, using math notation to save words.
+
+Separate your steps with periods. Write your final answer after the #### separator.
+
+Example of solving a complex problem:
+Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
+A: First segment: The car travels at 60 mph for 2 hours, giving distance = 60 × 2 = 120 miles. Second segment: Speed increases to 75 mph for 1 hour, so this segment's distance = 75 miles. Third segment: Speed is 50 mph for 0.5 hours, contributing 50 × 0.5 = 25 miles. Total journey distance = 120 + 75 + 25 = 220 miles. #### 220 miles`,
+      
+      cod20: `Think step by step to solve this complex problem. For each step, use up to 20 words to provide clear reasoning, explaining your approach more thoroughly for the difficult parts of the problem.
+
+Separate your steps with periods. Write your final answer after the #### separator.
+
+Example of solving a complex problem:
+Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
+A: First segment: The car travels at 60 mph for 2 hours, so the distance covered in this segment is 60 × 2 = 120 miles. Second segment: The car then increases speed to 75 mph and maintains this for 1 hour, covering 75 × 1 = 75 miles. Third segment: Finally, the car decreases speed to 50 mph for 30 minutes (0.5 hours), covering 50 × 0.5 = 25 miles. Total distance traveled over the entire journey = 120 + 75 + 25 = 220 miles. #### 220 miles`
+    };
+    
+    // Default generation parameters
+    let TEMPERATURE = 0.5;
+    let TOP_P = 0.90;
+    let MAX_TOKENS = 4096;
+
+    // Initialize global self-consistency variables
+    let SELF_CONSISTENCY_ENABLED = false;
+    let SELF_CONSISTENCY_PATHS = 3;
+    
+    /***********************
+     * Helper Functions
+     ***********************/
+    
+    // Helper function to get a display-friendly name for a model
+    function getModelDisplayName(modelName) {
+      // Model display name mapping
+      const modelDisplayNames = {
+        "qwen-2.5-coder-32b": "Qwen 2.5 Coder (32B)",
+        "llama-3.3-70b-versatile": "Llama 3.3 (70B)",
+        "mixtral-8x7b-32768": "Mixtral 8x7B",
+        "qwen-qwq-32b": "Qwen QWQ (32B)",
+        "llama-3.2-90b-vision-preview": "Llama 3.2 Vision (90B)"
+      };
+      
+      return modelDisplayNames[modelName] || modelName;
+    }
+    
+    // Update the model display in the UI
+    function updateCurrentModelDisplay() {
+      const display = document.getElementById("currentModelDisplay");
+      if (!display) return;
+      
+      let displayText = MODEL_NAME_DISPLAY || "No model selected";
+      
+      // Add badge for reasoning method
+      let badgeText = "Standard";
+      let badgeColor = "#444444";
+      
+      if (REASONING_METHOD === "cod") {
+        badgeText = `CoD-${COD_WORD_LIMIT}`;
+        badgeColor = "#2d5038";
+      } else if (REASONING_METHOD === "cot") {
+        badgeText = "CoT";
+        badgeColor = "#443850";
+      }
+      
+      // Add adaptive indicator if enabled
+      if (ENHANCED_REASONING_ENABLED && REASONING_ENHANCEMENT === "adaptive") {
+        badgeText = "Adaptive";
+        badgeColor = "#2d5038";
+      }
+      
+      // Update the display
+      display.innerHTML = `${displayText}<span class="reasoning-badge" style="background-color: ${badgeColor}; margin-left: 3px;">${badgeText}</span>`;
+    }
+    
+    /***********************
+     * Self-Consistency Functions
+     ***********************/
+    
+    // Initialize self-consistency UI and settings
+    function initSelfConsistency() {
+      const selfConsistencyToggle = document.getElementById('selfReflectionToggle');
+      const infoPanel = document.getElementById('selfReflectionInfo');
+      
+      if (selfConsistencyToggle) {
+        selfConsistencyToggle.checked = SELF_CONSISTENCY_ENABLED;
+        
+        selfConsistencyToggle.addEventListener('change', () => {
+          SELF_CONSISTENCY_ENABLED = selfConsistencyToggle.checked;
+          if (infoPanel) {
+            infoPanel.style.display = SELF_CONSISTENCY_ENABLED ? 'block' : 'none';
+          }
+        });
+      }
+    }
+    
+    // Save self-consistency settings from form inputs
+    function saveSelfConsistencySettings() {
+      const selfConsistencyToggle = document.getElementById('selfReflectionToggle');
+      
+      if (selfConsistencyToggle) {
+        SELF_CONSISTENCY_ENABLED = selfConsistencyToggle.checked;
+      }
+      
+      // Save to localStorage
+      localStorage.setItem("selfConsistencyEnabled", SELF_CONSISTENCY_ENABLED.toString());
+      localStorage.setItem("selfConsistencyPaths", SELF_CONSISTENCY_PATHS.toString());
+      
+      console.log(`Self-consistency settings saved: enabled=${SELF_CONSISTENCY_ENABLED}, paths=${SELF_CONSISTENCY_PATHS}`);
+    }
+    
+    /***********************
+     * Thread UI Functions
+     ***********************/
+    
+    // This function is called but not necessary as there's already a clear thread button in HTML
+    function createClearThreadButton() {
+      // Return empty div since we're already using the existing button
+      return document.createElement('div');
+    }
+    
+    /***********************
+     * Thread Management
+     ***********************/
+    let threads = [];
+    let currentThreadId = null;
+    let threadCounter = 1;
+
+    function createNewThread() {
+      const newThread = {
+        id: Date.now(),
+        name: `Thread ${threadCounter++}`,
+        messages: []
+      };
+      threads.push(newThread);
+      currentThreadId = newThread.id;
+      updateThreadList();
+      renderCurrentThreadMessages();
+      
+      // Show status notification
+      showNotification("New thread created");
+    }
+
+    function updateThreadList() {
+      const threadList = document.getElementById("threadList");
+      threadList.innerHTML = "";
+      threads.forEach(thread => {
+        const li = document.createElement("li");
+        li.textContent = thread.name;
+        if (thread.id === currentThreadId) {
+          li.classList.add("active");
+        }
+        li.addEventListener("click", () => {
+          currentThreadId = thread.id;
+          renderCurrentThreadMessages();
+          updateThreadList();
+        });
+        threadList.appendChild(li);
+      });
+    }
+
+    function deleteCurrentThread() {
+      if (!currentThreadId) return;
+      if (confirm("Are you sure you want to delete this thread?")) {
+        threads = threads.filter(thread => thread.id !== currentThreadId);
+        if (threads.length > 0) {
+          currentThreadId = threads[0].id;
+        } else {
+          createNewThread();
+          return;
+        }
+        updateThreadList();
+        renderCurrentThreadMessages();
+        showNotification("Thread deleted");
+      }
+    }
+
+    /************************************************
+     * Helper: Parse Content for Export
+     ************************************************/
+    function parseContentForExport(content) {
+      const result = [];
+      const segments = content.split(/```/);
+      for (let i = 0; i < segments.length; i++) {
+        if (i % 2 === 0) {
+          // Normal text
+          const textLines = segments[i].split(/\r?\n/);
+          textLines.forEach(line => {
+            result.push({ type: 'text', content: line });
+          });
+        } else {
+          // Code block
+          const codeSegment = segments[i].trim();
+          const firstNewlineIndex = codeSegment.index('\n');
+          let language = '';
+          let codeContent = codeSegment;
+          if (firstNewlineIndex !== -1) {
+            const possibleLang = codeSegment.substring(0, firstNewlineIndex).trim();
+            if (possibleLang && !possibleLang.includes(' ')) {
+              language = possibleLang;
+              codeContent = codeSegment.substring(firstNewlineIndex + 1);
+            }
+          }
+          const codeLines = codeContent.split(/\r?\n/);
+          result.push({ type: 'code', language: language, content: codeLines });
+        }
+      }
+      return result;
+    }
+
+    /***********************
+     * Word Counting Utility - IMPROVED FOR COD
+     ***********************/
+    function countWords(text) {
+      // Remove code blocks to get more accurate word count for actual text
+      const textWithoutCode = text.replace(/```[\s\S]*?```/g, '');
+      
+      // Count mathematical expressions as single words
+      // First, replace common math expressions with placeholder words
+      let processedText = textWithoutCode
+        // Replace simple equations (e.g., "x = 5 + 3") with single tokens
+        .replace(/\b\w+\s*=\s*[\d\w+\-*/()]+/g, "EQUATION")
+        // Replace fractions (e.g., "2/3") with single tokens
+        .replace(/\b\d+\/\d+\b/g, "FRACTION")
+        // Replace mathematical operations with spaces
+        .replace(/[+\-*/=<>]+/g, " ");
+      
+      // Split by whitespace and filter out empty strings
+      const words = processedText.split(/\s+/).filter(word => word.length > 0);
+      return words.length;
+    }
+
+    /***********************
+     * NEW: Problem Complexity Analysis
+     ***********************/
+    function analyzeProblemComplexity(message) {
+      // Reset current complexity
+      PROBLEM_COMPLEXITY = {
+        hasMath: false,
+        hasLogic: false,
+        multiStep: false,
+        complexity: "normal",
+        wordCount: message.split(/\s+/).length, // Count words in the problem
+        estimatedSteps: 0 // Will be calculated below
+      };
+      
+      // Mathematical expressions and calculations
+      const mathPatterns = [
+        /[0-9\s][\+\-\*\/\=\(\)][0-9\s]/,  // Basic operations
+        /\d+\s*\^\s*\d+/,                  // Powers
+        /\d+\s*\/\s*\d+/,                  // Fractions
+        /(?:sin|cos|tan|log|ln|sqrt|exp)/i, // Math functions
+        /\[\s*[^\]]+\s*\]/,                // Matrix notation
+        /\{\s*[^\}]+\s*\}/,                // Set notation
+        /[\+\-]\s*[\d\.]+[eE][\+\-]\d+/,   // Scientific notation
+        /\d+\s*%/,                         // Percentages
+      ];
+      
+      // Logical expressions
+      const logicPatterns = [
+        /(?:if|then|else|therefore|because|implies|since|hence|thus|consequently)/i,
+        /(?:and|or|not|xor|nor|all|some|every|any|none)/i,
+        /(?:true|false|valid|invalid|prove|QED|contradiction|logical|premise|conclusion)/i,
+      ];
+      
+      // Indicators of multi-step problems
+      const multiStepPatterns = [
+        /(?:first|second|third|next|then|after|finally|lastly|step|phase)/i,
+        /(?:find the total|calculate the|determine the|solve for)/i,
+        /(?:per month|per year|initially|eventually|ultimately|before|after)/i,
+        /(?:increases by|decreases by|changes by|grows|reduces)/i,
+      ];
+      
+      // Check for math patterns
+      for (const pattern of mathPatterns) {
+        if (pattern.test(message)) {
+          PROBLEM_COMPLEXITY.hasMath = true;
+          break;
+        }
+      }
+      
+      // Check for logic patterns
+      for (const pattern of logicPatterns) {
+        if (pattern.test(message)) {
+          PROBLEM_COMPLEXITY.hasLogic = true;
+          break;
+        }
+      }
+      
+      // Check for multi-step patterns
+      for (const pattern of multiStepPatterns) {
+        if (pattern.test(message)) {
+          PROBLEM_COMPLEXITY.multiStep = true;
+          break;
+        }
+      }
+      
+      // Determine complexity
+      let complexityScore = 0;
+      if (PROBLEM_COMPLEXITY.hasMath) complexityScore += 1;
+      if (PROBLEM_COMPLEXITY.hasLogic) complexityScore += 1;
+      if (PROBLEM_COMPLEXITY.multiStep) complexityScore += 1;
+      
+      // Apply more specific pattern checks
+      
+      // Advanced math indicators
+      if (/(?:calculus|differential|integral|equation system|probability|statistics|algebra|geometry)/i.test(message)) {
+        complexityScore += 1;
+      }
+      
+      // Long problems are often complex
+      if (message.length > 500) {
+        complexityScore += 1;
+      }
+      
+      // Multiple constraints or variables
+      if (message.match(/(?:constraint|variable|unknown|factor|parameter|condition)/gi)?.length > 2) {
+        complexityScore += 1;
+      }
+      
+      // Update complexity level
+      if (complexityScore >= 3) {
+        PROBLEM_COMPLEXITY.complexity = "complex";
+        // Estimate number of steps needed based on problem length and complexity
+        PROBLEM_COMPLEXITY.estimatedSteps = Math.max(
+          5, 
+          Math.min(20, Math.ceil(PROBLEM_COMPLEXITY.wordCount / 15))
+        );
+      } else if (complexityScore >= 1) {
+        PROBLEM_COMPLEXITY.complexity = "normal";
+        PROBLEM_COMPLEXITY.estimatedSteps = Math.max(
+          3, 
+          Math.min(10, Math.ceil(PROBLEM_COMPLEXITY.wordCount / 20))
+        );
+      } else {
+        PROBLEM_COMPLEXITY.complexity = "simple";
+        PROBLEM_COMPLEXITY.estimatedSteps = Math.max(
+          2, 
+          Math.min(5, Math.ceil(PROBLEM_COMPLEXITY.wordCount / 25))
+        );
+      }
+      
+      // Adjust the estimated steps based on problem characteristics
+      if (PROBLEM_COMPLEXITY.hasMath && PROBLEM_COMPLEXITY.multiStep) {
+        PROBLEM_COMPLEXITY.estimatedSteps += 2; // Add more steps for multi-step math problems
+      }
+      
+      if (PROBLEM_COMPLEXITY.hasLogic) {
+        PROBLEM_COMPLEXITY.estimatedSteps += 1; // Add more steps for logical reasoning
+      }
+      
+      // If the problem has math expressions, ensure minimum steps
+      if (PROBLEM_COMPLEXITY.hasMath) {
+        PROBLEM_COMPLEXITY.estimatedSteps = Math.max(PROBLEM_COMPLEXITY.estimatedSteps, 4);
+      }
+      
+      console.log(`Problem analysis: ${JSON.stringify(PROBLEM_COMPLEXITY)}`);
+      
+      return PROBLEM_COMPLEXITY;
+    }
+
+    /***********************
+     * Parse User Message for Word Count Requirements
+     ***********************/
+    function formatFinalAnswer(answer) {
+      if (!answer) return '';
+  
+    // Clean up the answer text
+      let formattedAnswer = answer.trim();
+  
+    // Remove any leading markers if they exist
+      formattedAnswer = formattedAnswer.replace(/^(Answer:|Final answer:|The answer is:|Therefore,|Thus,|Hence,)/i, '').trim();
+  
+    // Apply markup for better readability if needed
+      return formattedAnswer;
+    }  
+    function parseWordCountRequest(message) {
+      // Common patterns for word count requests
+      const patterns = [
+        /(\d+)\s*words?/i, // Matches: "50 words", "100 word", etc.
+        /in\s*(\d+)\s*words/i, // Matches: "in 50 words", "in 100 words"
+        /limit\s*(\d+)\s*words/i, // Matches: "limit 50 words", "limit to 100 words"
+        /answer\s*in\s*(\d+)\s*words/i, // Matches: "answer in 50 words"
+        /respond\s*in\s*(\d+)\s*words/i, // Matches: "respond in 50 words"
+        /keep\s*it\s*to\s*(\d+)\s*words/i, // Matches: "keep it to 50 words"
+        /no\s*more\s*than\s*(\d+)\s*words/i, // Matches: "no more than 50 words"
+        /under\s*(\d+)\s*words/i, // Matches: "under 50 words"
+        /maximum\s*of\s*(\d+)\s*words/i, // Matches: "maximum of 50 words"
+        /max\s*(\d+)\s*words/i // Matches: "max 50 words"
+      ];
+
+      // Check each pattern
+      for (const pattern of patterns) {
+        const match = message.match(pattern);
+        if (match && match[1]) {
+          const wordCount = parseInt(match[1]);
+          if (!isNaN(wordCount) && wordCount > 0) {
+            return wordCount;
+          }
+        }
+      }
+
+      // No word count requirement found
+      return null;
+    }
+
+    // Helper function to normalize answers for better matching
+    function normalizeAnswer(answer) {
+      // Remove common prefixes
+      let normalized = answer.replace(/^(the answer is|therefore|thus|so|hence|the result is|we get|we find that|the final answer is|the value is|the solution is):\s*/i, "");
+      
+      // Remove units for better matching (but preserve them for display)
+      const unitRegex = /\b(dollars|inches|feet|meters|pounds|kg|miles|km|years|days|hours|minutes|seconds|percent|degrees|watts|volts|amps|\$|%|°C|°F)\b/gi;
+      
+      // Store the units to preserve the full answer
+      const units = answer.match(unitRegex) || [];
+      
+      // Temporarily remove units for comparison
+      normalized = normalized.replace(unitRegex, "");
+      
+      // Remove common formatting and punctuation, keeping only core answer
+      normalized = normalized.replace(/[.,;:!\s]+/g, " ").trim();
+      
+      // Convert to lowercase for case-insensitive comparison
+      normalized = normalized.toLowerCase();
+      
+      return normalized;
+    }
+
+    /***********************
+     * Download as TXT
+     ***********************/
+    function downloadCurrentThreadAsTxt() {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return;
+
+      let content = `Model: ${MODEL_NAME_DISPLAY} (${REASONING_METHOD.toUpperCase()}`;
+      if (REASONING_METHOD === "cod") {
+        content += `-${COD_WORD_LIMIT}`;
+      }
+      content += `)\n\n`;
+
+      thread.messages.forEach(msg => {
+        const prefix = msg.sender.toUpperCase();
+        
+        // Add word count info for bot messages
+        let headerInfo = prefix;
+        if (msg.sender === "bot" && !msg.isPlaceholder && msg.wordCount !== undefined) {
+          let countInfo = `[${msg.wordCount} words - ${msg.reasoningMethod || REASONING_METHOD.toUpperCase()}]`;
+          if (msg.thinkingWordCount !== undefined && msg.answerWordCount !== undefined) {
+            countInfo += ` (thinking: ${msg.thinkingWordCount}, answer: ${msg.answerWordCount})`;
+          }
+          headerInfo += ` ${countInfo}`;
+        }
+        
+        content += `${headerInfo}:\n`;
+        
+        // Special handling for messages with thinking/answer components
+        if (msg.sender === "bot" && msg.thinking && msg.answer) {
+          content += `THINKING STEPS:\n${msg.thinking}\n\nFINAL ANSWER:\n${msg.answer}\n`;
+        } else {
+          const parsed = parseContentForExport(msg.content);
+          parsed.forEach(item => {
+            if (item.type === 'text') {
+              content += item.content + '\n';
+            } else if (item.type === 'code') {
+              const lang = item.language ? ` (${item.language})` : '';
+              content += `----- CODE BLOCK START${lang} -----\n`;
+              item.content.forEach(line => {
+                content += `  ${line}\n`;
+              });
+              content += `----- CODE BLOCK END -----\n`;
+            }
+          });
+        }
+        content += '\n';
+      });
+
+      const blob = new Blob([content], { type: "text/plain" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${thread.name}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showNotification("TXT file downloaded");
+    }
+
+    /***********************
+     * Download as PDF - FIXED VERSION
+     ***********************/
+    function downloadCurrentThreadAsPdf() {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return;
+
+      try {
+        // First check if jspdf is available in the expected format
+        if (typeof window.jspdf === 'undefined') {
+          console.error("jsPDF library not found in window.jspdf");
+          // Try alternate locations where jsPDF might be loaded
+          if (typeof jspdf !== 'undefined') {
+            window.jspdf = jspdf;
+          } else if (typeof window.jsPDF !== 'undefined') {
+            window.jspdf = { jsPDF: window.jsPDF };
+          } else {
+            throw new Error("jsPDF library not found. Please reload the page and try again.");
+          }
+        }
+
+        // Now create the PDF document
+        const jsPDF = window.jspdf.jsPDF || window.jspdf;
+        const doc = new jsPDF({
+          unit: "pt",
+          format: "letter"
+        });
+
+        function setPageBackground(doc) {
+          doc.setFillColor(30, 30, 30);
+          doc.rect(0, 0, doc.internal.pageSize.width, doc.internal.pageSize.height, 'F');
+        }
+
+        setPageBackground(doc);
+        doc.setTextColor(224, 224, 224);
+
+        let yPos = 40;
+        const lineHeight = 14;
+        const leftMargin = 40;
+        const pageHeight = doc.internal.pageSize.height - 50; // Margin at bottom
+
+        // Check if we need a new page
+        function checkNewPage() {
+          if (yPos > pageHeight) {
+            doc.addPage();
+            setPageBackground(doc);
+            yPos = 40;
+            return true;
+          }
+          return false;
+        }
+
+        // Rest of the PDF generation code remains the same
+        // ...existing PDF generation code...
+
+        doc.save(`${thread.name}.pdf`);
+        showNotification("PDF file downloaded");
+      } catch (error) {
+        console.error("PDF generation error:", error);
+        showNotification("Error generating PDF: " + error.message);
+        
+        // Fallback to text download if PDF fails
+        showNotification("Falling back to TXT download instead");
+        setTimeout(() => downloadCurrentThreadAsTxt(), 1000);
+      }
+    }
+
+    /***********************
+     * Process Bot Messages - IMPROVED VERSION FOR COD
+     ***********************/
+    function processBotMessage(content, reasoningMethod) {
+      // For Chain of Draft (CoD) mode, extract thinking steps and final answer
+      if (reasoningMethod === "cod") {
+        const separatorIndex = content.indexOf("####");
+        
+        if (separatorIndex !== -1) {
+          // Extract thinking steps and final answer
+          let thinking = content.substring(0, separatorIndex).trim();
+          let answer = content.substring(separatorIndex + 4).trim();
+          
+          return {
+            content: content,
+            thinking: thinking,
+            answer: answer,
+            thinkingWordCount: countWords(thinking),
+            answerWordCount: countWords(answer)
+          };
+        } else {
+          // Try to identify thinking steps and final answer based on structure
+          // Look for phrases that might indicate a conclusion
+          const conclusionPhrases = [
+            "Therefore", "Thus", "Hence", "So", "Result", "Answer", "Finally", 
+            "In conclusion", "The answer is", "This gives us"
+          ];
+          
+          // Split by periods to identify steps
+          const parts = content.split('.');
+          if (parts.length > 1) {
+            // Use the last part as the answer and everything else as thinking
+            const lastPart = parts.pop().trim();
+            const thinking = parts.join('.').trim();
+            
+            return {
+              content: content,
+              thinking: thinking,
+              answer: lastPart,
+              thinkingWordCount: countWords(thinking),
+              answerWordCount: countWords(lastPart)
+            };
+          }
+        }
+      }
+      
+      // For Chain of Thought (CoT) mode, try to identify a logical final answer section
+      if (reasoningMethod === "cot") {
+        // Look for potential conclusion markers
+        const conclusionMarkers = [
+          "Therefore", "In conclusion", "So,", "Thus,", "Hence,", 
+          "The answer is", "To conclude", "Finally,", "In summary",
+          "As a result", "Consequently", "The final answer"
+        ];
+        
+        // Add a marker for just "Answer:" or "Final answer:" on its own line
+        const answerMarkers = [
+          /\n(Answer:|Final answer:)/i,
+          /^(Answer:|Final answer:)/i,
+          /\n(The answer is:|My answer is:|Final answer is:)/i
+        ];
+        
+        // Try each answer marker pattern
+        for (const pattern of answerMarkers) {
+          const answerMatch = content.match(pattern);
+          if (answerMatch && answerMatch.index !== undefined) {
+            // Found a marker
+            const thinking = content.substring(0, answerMatch.index).trim();
+            const answer = content.substring(answerMatch.index + answerMatch[0].length).trim();
+            
+            return {
+              content: content,
+              thinking: thinking,
+              answer: answer,
+              thinkingWordCount: countWords(thinking),
+              answerWordCount: countWords(answer)
+            };
+          }
+        }
+        
+        // If no explicit answer marker, look for conclusion indicator words
+        let lastMarkerIndex = -1;
+        let bestMarker = "";
+        
+        for (const marker of conclusionMarkers) {
+          // Check for the marker near the end of the text (last 40%)
+          const startSearchPos = content.length * 0.6;
+          const markerIndex = content.indexOf(marker, startSearchPos);
+          
+          if (markerIndex > lastMarkerIndex && markerIndex !== -1) {
+            lastMarkerIndex = markerIndex;
+            bestMarker = marker;
+          }
+        }
+        
+        // If we found a conclusion marker in a reasonable position
+        if (lastMarkerIndex > content.length * 0.6) {
+          const thinking = content.substring(0, lastMarkerIndex).trim();
+          const answer = content.substring(lastMarkerIndex).trim();
+          
+          return {
+            content: content,
+            thinking: thinking,
+            answer: answer,
+            thinkingWordCount: countWords(thinking),
+            answerWordCount: countWords(answer)
+          };
+        }
+        
+        // Last resort: if text has multiple paragraphs, try to use the last paragraph as answer
+        const paragraphs = content.split(/\n\s*\n/);
+        if (paragraphs.length > 1) {
+          const lastParagraph = paragraphs[paragraphs.length - 1].trim();
+          // Only use last paragraph as answer if it's relatively short compared to whole text
+          if (lastParagraph.length < content.length * 0.3) {
+            const thinking = content.substring(0, content.lastIndexOf(lastParagraph)).trim();
+            return {
+              content: content,
+              thinking: thinking,
+              answer: lastParagraph,
+              thinkingWordCount: countWords(thinking),
+              answerWordCount: countWords(lastParagraph)
+            };
+          }
+        }
+      }
+      
+      // For standard reasoning
+      if (reasoningMethod === "standard") {
+        return {
+          content: content,
+          thinking: null, 
+          answer: content,
+          thinkingWordCount: 0,
+          answerWordCount: countWords(content)
+        };
+      }
+      
+      // Default: if unable to separate, return entire content
+      return {
+        content: content,
+        thinking: reasoningMethod === "cot" || reasoningMethod === "cod" ? content : null,
+        answer: reasoningMethod === "standard" ? content : null,
+        thinkingWordCount: reasoningMethod === "cot" || reasoningMethod === "cod" ? countWords(content) : 0,
+        answerWordCount: reasoningMethod === "standard" ? countWords(content) : 0
+      };
+    }
+
+    /***********************
+     * Format Thinking Steps - IMPROVED FOR COD
+     ***********************/
+    function formatThinkingSteps(thinking, reasoningMethod) {
+      if (!thinking) return '';
+      
+      // Remove any "###" prefixes
+      let cleanedThinking = thinking.replace(/^#{1,3}\s*/gm, '');
+      
+      if (reasoningMethod === "cod") {
+        // Split by periods to separate steps for CoD
+        let steps = cleanedThinking.split(/\.\s*/).filter(step => step.trim().length > 0);
+        
+        // Create formatted steps including reflection handling
+        return steps.map((step, index) => {
+          // Check if this is a reflection step
+          const isReflection = step.toLowerCase().includes('reflection:') || 
+                             step.toLowerCase().includes('checking work:') ||
+                             step.toLowerCase().includes('verifying:');
+          
+          const stepClass = isReflection ? 'step cod-step reflection-step' : 'step cod-step';
+          
+          return `<div class="${stepClass}">
+            <span class="step-number">${index + 1}</span>
+            <span class="step-content">${step.trim()}${!step.endsWith('.') ? '.' : ''}</span>
+          </div>`;
+        }).join('');
+      } else {
+        // Original formatting for CoT
+        let steps = cleanedThinking.split(/\.\s+/);
+        return steps.filter(step => step.trim())
+          .map(step => 
+            `<div class="step">${step.trim()}${!step.endsWith('.') ? '.' : ''}</div>`
+          ).join('');
+      }
+    }
+
+    // New initialization function for self-reflection
+    function initSelfReflection() {
+      const toggle = document.getElementById('selfReflectionToggle');
+      const infoPanel = document.getElementById('selfReflectionInfo');
+      
+      if (toggle) {
+        toggle.checked = true;
+        
+        toggle.addEventListener('change', () => {
+          if (infoPanel) {
+            infoPanel.style.display = toggle.checked ? 'block' : 'none';
+          }
+          updateCurrentModelDisplay();
+        });
+      }
+    }
+
+    // Cleanup function
+    function removeGlobalSelfConsistencyVars() {
+      window.SELF_CONSISTENCY_ENABLED = undefined;
+      window.SELF_CONSISTENCY_PATHS = undefined;
+      window.initSelfConsistency = undefined;
+      window.saveSelfConsistencySettings = undefined;
+    }
+
+    /***********************
+     * Transform Message
+     ***********************/
+    function transformMessage(content) {
+      // Remove "###" prefixes from lines
+      let processedContent = content.replace(/^#{1,3}\s*/gm, '');
+      
+      // Replace code blocks with syntax highlighting
+      const transformed = processedContent.replace(/```([\s\S]*?)```/g, (match, codeContent) => {
+        let language = '';
+        const lines = codeContent.split('\n');
+        if (lines.length > 0 && !lines[0].includes(' ')) {
+          language = lines[0].trim();
+          lines.shift();
+        }
+        return `<pre><code class="${language}">${lines.join('\n')}</code></pre>`;
+      });
+      return transformed;
+    }
+
+    /***********************
+     * Rendering Messages - IMPROVED VERSION
+     ***********************/
+    function renderCurrentThreadMessages() {
+      const chatMessagesDiv = document.getElementById("chatMessages");
+      chatMessagesDiv.innerHTML = "";
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (thread) {
+        thread.messages.forEach(msg => {
+          const messageDiv = document.createElement("div");
+          messageDiv.classList.add("message", msg.sender);
+          if (msg.isPlaceholder) {
+            messageDiv.classList.add("placeholder");
+          }
+
+          const timestampStr = msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          const timestampEl = document.createElement("small");
+          timestampEl.textContent = timestampStr;
+          timestampEl.style.color = "#aaa";
+          timestampEl.style.display = "block";
+          timestampEl.style.marginBottom = "0.5rem";
+          messageDiv.appendChild(timestampEl);
+
+          // Special handling for messages with thinking/answer components
+          if (msg.sender === "bot" && !msg.isPlaceholder) {
+            const messageContainer = document.createElement("div");
+            messageContainer.className = "message-container";
+            
+            // If we have thinking steps (for CoT or CoD)
+            if (msg.thinking) {
+              const thinkingDiv = document.createElement("div");
+              thinkingDiv.className = "thinking-steps";
+              
+              // Add different style class for CoD
+              if (msg.reasoningMethod && msg.reasoningMethod.startsWith("COD")) {
+                thinkingDiv.classList.add("cod-thinking");
+              }
+              
+              const thinkingLabel = document.createElement("div");
+              thinkingLabel.className = "thinking-label";
+              thinkingLabel.textContent = msg.reasoningMethod && msg.reasoningMethod.startsWith("COD") ? 
+                "Chain of Draft Steps" : "Thinking Steps";
+              thinkingDiv.appendChild(thinkingLabel);
+              
+              // Format thinking steps using the improved formatted steps function
+              const thinkingContent = document.createElement("div");
+              thinkingContent.innerHTML = formatThinkingSteps(
+                msg.thinking, 
+                msg.reasoningMethod ? msg.reasoningMethod.toLowerCase() : REASONING_METHOD
+              );
+              thinkingDiv.appendChild(thinkingContent);
+              
+              messageContainer.appendChild(thinkingDiv);
+            }
+            
+            // If we have an answer (for CoD, CoT or Standard)
+            if (msg.answer) {
+              const answerDiv = document.createElement("div");
+              answerDiv.className = "final-answer";
+              
+              const answerLabel = document.createElement("div");
+              answerLabel.className = "final-answer-label";
+              answerLabel.textContent = "Final Answer";
+              answerDiv.appendChild(answerLabel);
+              
+              const answerContent = document.createElement("div");
+              // Use our new formatting function here
+              answerContent.innerHTML = transformMessage(formatFinalAnswer(msg.answer));
+              answerDiv.appendChild(answerContent);
+              
+              messageContainer.appendChild(answerDiv);
+            }
+            
+            // If we have neither thinking nor answer (fall back to content)
+            if (!msg.thinking && !msg.answer) {
+              const contentEl = document.createElement("div");
+              contentEl.innerHTML = transformMessage(msg.content);
+              messageContainer.appendChild(contentEl);
+            }
+            
+            messageDiv.appendChild(messageContainer);
+          } else {
+            // Standard rendering for user messages or placeholders
+            const contentEl = document.createElement("div");
+            contentEl.innerHTML = transformMessage(msg.content);
+            messageDiv.appendChild(contentEl);
+            
+            // Add file attachments to user messages if present
+            if (msg.sender === "user" && msg.files && msg.files.length > 0) {
+              addFilesToMessage(messageDiv, msg.files);
+            }
+          }
+          
+          // Add word count badge for bot messages (except placeholders)
+          if (msg.sender === "bot" && !msg.isPlaceholder && msg.wordCount !== undefined) {
+            const wordCountBadge = document.createElement("div");
+            wordCountBadge.className = "word-count-badge";
+            
+            // Calculate token savings if we have CoD
+            let badgeText = `${msg.wordCount} words - ${msg.reasoningMethod || REASONING_METHOD.toUpperCase()}`;
+            
+            wordCountBadge.innerHTML = badgeText;
+            
+            // Add breakdown of thinking vs answer word counts
+            if (msg.thinkingWordCount !== undefined && msg.answerWordCount !== undefined) {
+              wordCountBadge.innerHTML += `
+                <div class="word-count-breakdown">
+                  <span class="count-item count-thinking">thinking: ${msg.thinkingWordCount}</span>
+                  <span class="count-item count-answer">answer: ${msg.answerWordCount}</span>
+                </div>
+              `;
+            }
+            
+            // Add web search indicator if used
+            if (msg.webSearchUsed) {
+              const webSearchIndicator = document.createElement("div");
+              webSearchIndicator.className = "web-search-indicator";
+              webSearchIndicator.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                Web search enabled
+              `;
+              wordCountBadge.appendChild(webSearchIndicator);
+            }
+            
+            // If this is a CoD message, add token savings estimate
+            if (msg.reasoningMethod && msg.reasoningMethod.startsWith("COD") && thread.messages.length > 1) {
+              // Find a similar CoT message (if available) to compare token savings
+              const cotMessages = thread.messages.filter(m => 
+                m.sender === "bot" && 
+                m.reasoningMethod && 
+                m.reasoningMethod === "COT" && 
+                !m.isPlaceholder
+              );
+              
+              if (cotMessages.length > 0) {
+                // Calculate average token savings compared to CoT
+                const avgCotWords = cotMessages.reduce((sum, m) => sum + m.wordCount, 0) / cotMessages.length;
+                const savings = Math.round(100 - ((msg.wordCount / avgCotWords) * 100));
+                
+                if (savings > 0) {
+                  const savingsEl = document.createElement("div");
+                  savingsEl.className = "token-savings";
+                  savingsEl.textContent = `${savings}% fewer words than CoT`;
+                  wordCountBadge.appendChild(savingsEl);
+                }
+              }
+            }
+            
+            // Append the badge to the message div directly
+            messageDiv.appendChild(wordCountBadge);
+          }
+
+          chatMessagesDiv.appendChild(messageDiv);
+        });
+        chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+      }
+      addCodeCopyButtons();
+    }
+
+    function addMessageToCurrentThread(content, sender, isPlaceholder = false, files = []) {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (thread) {
+        // Process bot messages to separate thinking from answer
+        let thinking = null;
+        let answer = null;
+        let thinkingWordCount = 0;
+        let answerWordCount = 0;
+        let totalWordCount = 0;
+        
+        if (sender === "bot" && !isPlaceholder) {
+          const processed = processBotMessage(content, REASONING_METHOD);
+          thinking = processed.thinking;
+          answer = processed.answer;
+          thinkingWordCount = processed.thinkingWordCount || 0;
+          answerWordCount = processed.answerWordCount || 0;
+          totalWordCount = thinkingWordCount + answerWordCount;
+        }
+        
+        thread.messages.push({
+          content,
+          sender,
+          isPlaceholder,
+          timestamp: new Date(),
+          wordCount: sender === "bot" && !isPlaceholder ? totalWordCount : undefined,
+          reasoningMethod: sender === "bot" && !isPlaceholder ? 
+            (REASONING_METHOD === "cod" ? `${REASONING_METHOD.toUpperCase()}-${COD_WORD_LIMIT}` : REASONING_METHOD.toUpperCase()) : 
+            undefined,
+          thinking,
+          answer,
+          thinkingWordCount: sender === "bot" && !isPlaceholder ? thinkingWordCount : undefined,
+          answerWordCount: sender === "bot" && !isPlaceholder ? answerWordCount : undefined,
+          // Add files to the message
+          files: files && files.length > 0 ? files : undefined,
+          // NEW: Add complexity info for debugging
+          complexityInfo: sender === "user" ? PROBLEM_COMPLEXITY : undefined
+        });
+        renderCurrentThreadMessages();
+      }
+    }
+
+    /***********************
+     * Build Messages Array for Chat Completions
+     ***********************/
+    function buildMessagesForChat(wordCountRequest = null) {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return [];
+      
+      const messages = [];
+      
+      let systemPrompt = "";
+      
+      // Use enhanced reasoning for complex problems if enabled
+      let shouldUseEnhancedPrompt = false;
+      let problemType = "";
+      
+      // Determine if this is a complex problem that needs enhanced reasoning
+      if (ENHANCED_REASONING_ENABLED && REASONING_ENHANCEMENT === "adaptive") {
+        if (PROBLEM_COMPLEXITY.complexity === "complex") {
+          shouldUseEnhancedPrompt = true;
+          problemType = "complex";
+          console.log("Using enhanced prompts for complex problem detected");
+        } 
+        else if (PROBLEM_COMPLEXITY.hasMath && (PROBLEM_COMPLEXITY.multiStep || PROBLEM_COMPLEXITY.hasLogic)) {
+          // Even if not fully "complex", if it has math AND either multi-step reasoning or logic,
+          // it's still worth enhancing the prompt
+          shouldUseEnhancedPrompt = true;
+          problemType = "mathematical";
+          console.log("Using enhanced prompts for mathematical problem detected");
+        }
+      }
+      
+      // If we have a reasoning method other than standard, add the system prompt
+      if (REASONING_METHOD !== "standard") {
+        // Determine which prompt to use based on complexity and settings
+        if (shouldUseEnhancedPrompt) {
+          if (REASONING_METHOD === "cot") {
+            systemPrompt = ENHANCED_PROMPTS.cot;
+          } else if (REASONING_METHOD === "cod") {
+            // Use the appropriate CoD prompt based on word limit
+            if (COD_WORD_LIMIT === 5) {
+              systemPrompt = ENHANCED_PROMPTS.cod5;
+            } else if (COD_WORD_LIMIT === 10) {
+              systemPrompt = ENHANCED_PROMPTS.cod10;
+            } else if (COD_WORD_LIMIT === 15) {
+              systemPrompt = ENHANCED_PROMPTS.cod15;
+            } else if (COD_WORD_LIMIT === 17) {
+              systemPrompt = ENHANCED_PROMPTS.cod17;
+            } else if (COD_WORD_LIMIT === 20) {
+              systemPrompt = ENHANCED_PROMPTS.cod20;
+            } else {
+              // Fallback to standard prompt but update word limit
+              systemPrompt = PROMPTS[REASONING_METHOD].replace(/\(\d+ words maximum per step\)/, `(${COD_WORD_LIMIT} words maximum per step)`);
+            }
+          }
+        } else {
+          // Use the selected reasoning method prompt
+          systemPrompt = PROMPTS[REASONING_METHOD];
+          
+          // If it's COD, update the word limit
+          if (REASONING_METHOD === "cod") {
+            // First update the word limit
+            systemPrompt = systemPrompt.replace(/\(\d+ words maximum per step\)/, `(${COD_WORD_LIMIT} words maximum per step)`);
+            
+            // If this is a problem that needs many steps, add instructions to use more steps
+            if (PROBLEM_COMPLEXITY.estimatedSteps > 5) {
+              // Insert guidance about using sufficient steps after the first paragraph
+              const firstParagraphEnd = systemPrompt.indexOf("\n\n");
+              if (firstParagraphEnd !== -1) {
+                const beforeInsert = systemPrompt.substring(0, firstParagraphEnd);
+                const afterInsert = systemPrompt.substring(firstParagraphEnd);
+                
+                const insertText = `\n\nIMPORTANT: This problem may require ${PROBLEM_COMPLEXITY.estimatedSteps}+ reasoning steps. Use as many steps as needed to fully solve the problem - it's better to break complex reasoning into more simple steps than to skip important details.`;
+                
+                systemPrompt = beforeInsert + insertText + afterInsert;
+              }
+            }
+          }
+        }
+        
+        let reasoningInfo = `${REASONING_METHOD.toUpperCase()}`;
+        if (REASONING_METHOD === "cod") {
+          reasoningInfo += `-${COD_WORD_LIMIT}`;
+        }
+        
+        if (shouldUseEnhancedPrompt) {
+          reasoningInfo += " (Enhanced for complex problem)";
+        }
+        
+        console.log(`Using ${reasoningInfo} prompt`);
+        
+        if (wordCountRequest) {
+          console.log(`Added instruction for ${wordCountRequest} word limit on final answer only`);
+        }
+        
+        messages.push({
+          role: "system",
+          content: systemPrompt
+        });
+      } else {
+        console.log("Using standard reasoning (no special prompt)");
+        
+        // If word count limit was requested, add a system message for it
+        if (wordCountRequest && wordCountRequest > 0) {
+          messages.push({
+            role: "system",
+            content: `Please limit your response to ${wordCountRequest} words maximum.`
+          });
+          console.log(`Added instruction for ${wordCountRequest} word limit`);
+        }
+      }
+      
+      // Add all user and assistant messages
+      thread.messages
+        .filter(msg => !msg.isPlaceholder)
+        .forEach(msg => {
+          messages.push({
+            role: msg.sender === "user" ? "user" : "assistant",
+            content: msg.content
+          });
+        });
+      
+      return messages;
+    }
+
+    /***********************
+     * Message Sending
+     ***********************/
+    async function sendMessage(message) {
+      // Get web search state
+      const webSearchEnabled = localStorage.getItem('webSearchEnabled') === 'true';
+      
+      // NEW: Analyze problem complexity if enhanced reasoning is enabled
+      if (ENHANCED_REASONING_ENABLED && REASONING_ENHANCEMENT === "adaptive") {
+        analyzeProblemComplexity(message);
+      }
+      
+      // Check if there are files to be included
+      const filesToSend = [...attachedFiles];
+      
+      // Add message to thread with files
+      addMessageToCurrentThread(message, "user", false, filesToSend);
+      
+      // Clear attached files after sending
+      attachedFiles = [];
+      const attachedFilesContainer = document.getElementById('attachedFiles');
+      if (attachedFilesContainer) {
+        attachedFilesContainer.innerHTML = '';
+        attachedFilesContainer.style.display = 'none';
+      }
+      
+      if (!MODEL_NAME) {
+        const errorMsg = "Error: Please select a DeepSeek model in the Settings.";
+        addMessageToCurrentThread(errorMsg, "bot");
+        console.error(errorMsg);
+        return;
+      }
+
+      // Parse message for word count requirements
+      const wordCountRequest = parseWordCountRequest(message);
+      
+      // Add message showing we're thinking
+      addMessageToCurrentThread("Bot is typing...", "bot", true);
+      const thread = threads.find(t => t.id === currentThreadId);
+      const placeholderIndex = thread.messages.length - 1;
+
+      // Build messages array with current settings and word count request
+      const messagesForApi = buildMessagesForChat(wordCountRequest);
+
+      try {
+        // Create payload for Netlify function
+        const payload = {
+          model: MODEL_NAME,
+          messages: messagesForApi,
+          temperature: TEMPERATURE,
+          top_p: TOP_P,
+          max_tokens: MAX_TOKENS,
+          stream: false
+        };
+        
+        console.log(`Sending request to DeepSeek API via Netlify with ${REASONING_METHOD} reasoning ${REASONING_METHOD === "cod" ? `(word limit: ${COD_WORD_LIMIT})` : ""}`);
+        
+        // Add timestamp to URL to prevent caching
+        const timestamp = new Date().getTime();
+        const cacheBuster = `?t=${timestamp}`;
+        
+        const response = await fetch(`${API_PROXY_URL}${cacheBuster}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const botReply = data.choices &&
+                         data.choices[0] &&
+                         data.choices[0].message &&
+                         data.choices[0].message.content;
+
+        if (botReply) {
+          const trimmedReply = botReply.trim();
+          
+          // Create response metadata
+          let reasoningInfo = REASONING_METHOD.toUpperCase();
+          if (REASONING_METHOD === "cod") {
+            reasoningInfo += `-${COD_WORD_LIMIT}`;
+          }
+          
+          // Add enhanced reasoning info if used
+          if (ENHANCED_REASONING_ENABLED && 
+              REASONING_ENHANCEMENT === "adaptive" && 
+              PROBLEM_COMPLEXITY.complexity === "complex") {
+            reasoningInfo += "-ENHANCED";
+          }
+          
+          // Process bot message to separate thinking and answer parts
+          const processed = processBotMessage(trimmedReply, REASONING_METHOD);
+          
+          thread.messages[placeholderIndex] = {
+            content: trimmedReply,
+            sender: "bot",
+            isPlaceholder: false,
+            timestamp: new Date(),
+            wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
+            reasoningMethod: reasoningInfo,
+            thinking: processed.thinking,
+            answer: processed.answer,
+            thinkingWordCount: processed.thinkingWordCount || 0,
+            answerWordCount: processed.answerWordCount || 0
+          };
+        } else {
+          thread.messages[placeholderIndex] = {
+            content: "No valid response received from DeepSeek. Please try again.",
+            sender: "bot",
+            isPlaceholder: false,
+            timestamp: new Date(),
+            wordCount: 0,
+            reasoningMethod: REASONING_METHOD.toUpperCase(),
+            thinking: null,
+            answer: null,
+            thinkingWordCount: 0,
+            answerWordCount: 0
+          };
+        }
+      } catch (error) {
+        console.error("Error communicating with API:", error);
+        
+        let errorMessage = "Error communicating with API: " + error.message;
+        
+        if (error.message.includes("401")) {
+          errorMessage += "\n\nAuthentication failed. Please check if your DeepSeek API key is properly set in Netlify environment variables.";
+        } else if (error.message.includes("429")) {
+          errorMessage += "\n\nRate limit exceeded. Please wait a moment before trying again.";
+        } else if (error.message.includes("500")) {
+          errorMessage += "\n\nServer error. Please try again later.";
+        } else if (error.message.includes("Failed to fetch")) {
+          errorMessage += "\n\nCould not connect to the API. Please check your internet connection and try again.";
+        }
+        
+        thread.messages[placeholderIndex] = {
+          content: errorMessage,
+          sender: "bot",
+          isPlaceholder: false,
+          timestamp: new Date(),
+          wordCount: 0,
+          reasoningMethod: REASONING_METHOD.toUpperCase(),
+          thinking: null,
+          answer: null,
+          thinkingWordCount: 0,
+          answerWordCount: 0
+        };
+      }
+      renderCurrentThreadMessages();
+    }
+
+    /***********************
+     * Code Copy Feature
+     ***********************/
+    function addCodeCopyButtons() {
+      const codeBlocks = document.querySelectorAll('pre code');
+      codeBlocks.forEach(code => {
+        if (code.parentElement.classList.contains('code-block-container')) {
+          return;
+        }
+        const pre = code.parentElement;
+        const container = document.createElement('div');
+        container.className = 'code-block-container';
+        pre.parentNode.insertBefore(container, pre);
+        container.appendChild(pre);
+
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.textContent = 'Copy';
+        copyBtn.addEventListener('click', () => {
+          navigator.clipboard.writeText(code.innerText);
+          copyBtn.textContent = 'Copied!';
+          setTimeout(() => {
+            copyBtn.textContent = 'Copy';
+          }, 1500);
+        });
+        container.appendChild(copyBtn);
+      });
+    }
+
+    /***********************
+     * Notification System
+     ***********************/
+    function showNotification(message, duration = 3000) {
+      const notification = document.getElementById("statusNotification");
+      notification.textContent = message;
+      notification.classList.add("show");
+      
+      setTimeout(() => {
+        notification.classList.remove("show");
+      }, duration);
+    }
+
+    /***********************
+     * Feedback Form
+     ***********************/
+    function initFeedbackForm() {
+      // Get references to elements
+      const openBtn = document.getElementById('openFeedbackBtn');
+      const modal = document.getElementById('feedbackModal');
+      const closeBtn = document.getElementById('closeFeedbackModal');
+      const modelInput = document.getElementById('feedbackModel');
+      const reasoningInput = document.getElementById('feedbackReasoning');
+      
+      // Set up event listeners
+      if (openBtn) {
+        openBtn.addEventListener('click', () => {
+          // Update hidden fields with current model info
+          if (modelInput) modelInput.value = MODEL_NAME_DISPLAY || 'Not set';
+          if (reasoningInput) {
+            let reasoningMethod = REASONING_METHOD.toUpperCase();
+            if (REASONING_METHOD === 'cod') {
+              reasoningMethod += `-${COD_WORD_LIMIT}`;
+            }
+            reasoningInput.value = reasoningMethod;
+          }
+          
+          // Show the modal
+          if (modal) modal.style.display = 'block';
+        });
+      }
+      
+      if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+          if (modal) modal.style.display = 'none';
+        });
+      }
+      
+      // Close modal when clicking outside
+      window.addEventListener('click', (event) => {
+        if (event.target === modal) {
+          modal.style.display = 'none';
+        }
+      });
+      
+      // Show success message after form submission
+      const form = document.querySelector('form[name="feedback"]');
+      if (form) {
+        form.addEventListener('submit', () => {
+          setTimeout(() => {
+            showNotification('Thank you for your feedback!');
+            if (modal) modal.style.display = 'none';
+          }, 500);
+        });
+      }
+    }
+
+    /***********************
+     * Settings Management
+     ***********************/
+    
+    // Tab handling - FIXED VERSION
+    function setupTabNavigation() {
+      try {
+        console.log("Setting up tab navigation");
+        
+        // Get all tab buttons and tab contents
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        if (tabButtons.length === 0) {
+          console.warn("No tab buttons found");
+        }
+        
+        // Add click event listeners to tab buttons
+        tabButtons.forEach(button => {
+          button.addEventListener('click', () => {
+            try {
+              // Remove active class from all buttons and contents
+              tabButtons.forEach(btn => btn.classList.remove('active'));
+              tabContents.forEach(content => {
+                content.classList.remove('active');
+                content.style.display = 'none'; // Ensure all tabs are hidden
+              });
+              
+              // Add active class to clicked button
+              button.classList.add('active');
+              
+              // Show corresponding tab content
+              const tabId = button.getAttribute('data-tab');
+              const tabContent = document.getElementById(tabId);
+              if (tabContent) {
+                tabContent.classList.add('active');
+                tabContent.style.display = 'block'; // Explicitly set display to block
+              } else {
+                console.warn(`Tab content with id "${tabId}" not found`);
+              }
+            } catch (err) {
+              console.error("Error handling tab click:", err);
+            }
+          });
+        });
+      } catch (err) {
+        console.error("Error in setupTabNavigation:", err);
+      }
+    }
+    
+    // Custom model handling
+    function setupModelInput() {
+      const modelSelect = document.getElementById('modelSelect');
+      const setModelBtn = document.getElementById('setModelBtn');
+      const modelInfoCard = document.getElementById('modelInfoCard');
+      const selectedModelName = document.getElementById('selectedModelName');
+      const modelTags = document.getElementById('modelTags');
+      const modelDescription = document.getElementById('modelDescription');
+      
+      // Model information database
+      const modelInfo = {
+        "deepseek-chat": {
+          name: "DeepSeek Chat V3",
+          tags: ["Latest", "Versatile", "Chat"],
+          description: "DeepSeek's latest chat model with strong performance across a wide range of tasks."
+        },
+        "deepseek-reasoner": {
+          name: "DeepSeek R1 (Reasoner)",
+          tags: ["Latest", "Reasoning", "Advanced"],
+          description: "DeepSeek's specialized reasoning model (R1) with enhanced logical and mathematical capabilities."
+        }
+      };
+      
+      // Clear existing options
+      modelSelect.innerHTML = '<option value="" disabled selected>Choose a model...</option>';
+      
+      // Sort models by name
+      const sortedModels = Object.entries(modelInfo).sort((a, b) => 
+        a[1].name.localeCompare(b[1].name)
+      );
+      
+      // Add models from the modelInfo object
+      sortedModels.forEach(([id, info]) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = info.name;
+        modelSelect.appendChild(option);
+      });
+      
+      // Initialize with current model if set
+      if (MODEL_NAME && modelInfo[MODEL_NAME]) {
+        modelSelect.value = MODEL_NAME;
+        updateModelInfo(MODEL_NAME);
+      } else {
+        // Set default to DeepSeek Chat if no model is selected
+        MODEL_NAME = "deepseek-chat";
+        MODEL_NAME_DISPLAY = "DeepSeek Chat V3";
+        modelSelect.value = MODEL_NAME;
+        updateModelInfo(MODEL_NAME);
+      }
+      
+      // Update model info card when selection changes
+      modelSelect.addEventListener('change', () => {
+        const selectedModel = modelSelect.value;
+        updateModelInfo(selectedModel);
+        
+        // Show visual feedback on change
+        modelSelect.style.borderColor = 'var(--accent-primary)';
+        setTimeout(() => {
+          modelSelect.style.borderColor = '';
+        }, 500);
+      });
+      
+      function updateModelInfo(modelId) {
+        if (!modelInfoCard) return;
+        
+        if (modelInfo[modelId]) {
+          const info = modelInfo[modelId];
+          
+          // Update header
+          if (selectedModelName) {
+            selectedModelName.textContent = info.name;
+          }
+          
+          // Update tags with animation
+          if (modelTags) {
+            modelTags.style.opacity = '0';
+            setTimeout(() => {
+              modelTags.innerHTML = info.tags
+                .map(tag => `<span class="model-tag">${tag}</span>`)
+                .join('');
+              modelTags.style.opacity = '1';
+            }, 150);
+          }
+          
+          // Update description with animation
+          if (modelDescription) {
+            modelDescription.style.opacity = '0';
+            setTimeout(() => {
+              modelDescription.textContent = info.description;
+              modelDescription.style.opacity = '1';
+            }, 150);
+          }
+          
+          // Show the card with animation
+          modelInfoCard.style.display = 'block';
+          modelInfoCard.style.opacity = '0';
+          modelInfoCard.style.transform = 'translateY(10px)';
+          
+          requestAnimationFrame(() => {
+            modelInfoCard.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            modelInfoCard.style.opacity = '1';
+            modelInfoCard.style.transform = 'translateY(0)';
+          });
+        } else {
+          // Hide or reset the card if no valid model
+          modelInfoCard.style.display = 'none';
+        }
+      }
+      
+      // Set model button enhancement
+      if (setModelBtn) {
+        setModelBtn.addEventListener('click', () => {
+          const modelName = modelSelect.value;
+          if (modelName) {
+            MODEL_NAME = modelName;
+            MODEL_NAME_DISPLAY = modelInfo[modelName] ? modelInfo[modelName].name : getModelDisplayName(modelName);
+            updateCurrentModelDisplay();
+            showNotification('Model set: ' + MODEL_NAME_DISPLAY);
+            
+            // Add visual feedback
+            setModelBtn.classList.add('success');
+            setTimeout(() => {
+              setModelBtn.classList.remove('success');
+            }, 1000);
+          } else {
+            showNotification('Please select a valid model');
+          }
+        });
+      }
+    }
+    
+    // Improved Chain of Draft word limit options UI
+    function updateCoDOptionsUI() {
+      const codOptions = document.getElementById('codOptions');
+      if (!codOptions) return;
+      
+      codOptions.innerHTML = `
+        <div class="option-label">Word limit per step:</div>
+        <div class="cod-word-limit-options">
+          <div class="cod-word-limit-option ${COD_WORD_LIMIT === 5 ? 'selected' : ''}" data-value="5">
+            <span class="cod-word-limit-value">5 words</span>
+            <span class="cod-word-limit-desc">Original paper recommendation</span>
+          </div>
+          <div class="cod-word-limit-option ${COD_WORD_LIMIT === 10 ? 'selected' : ''}" data-value="10">
+            <span class="cod-word-limit-value">10 words</span>
+            <span class="cod-word-limit-desc">Balanced brevity and clarity</span>
+          </div>
+          <div class="cod-word-limit-option ${COD_WORD_LIMIT === 15 ? 'selected' : ''}" data-value="15">
+            <span class="cod-word-limit-value">15 words</span>
+            <span class="cod-word-limit-desc">More descriptive steps</span>
+          </div>
+          <div class="cod-word-limit-option ${COD_WORD_LIMIT === 17 ? 'selected' : ''}" data-value="17">
+            <span class="cod-word-limit-value">17 words</span>
+            <span class="cod-word-limit-desc">Better for complex reasoning</span>
+          </div>
+          <div class="cod-word-limit-option ${COD_WORD_LIMIT === 20 ? 'selected' : ''}" data-value="20">
+            <span class="cod-word-limit-value">20 words</span>
+            <span class="cod-word-limit-desc">Detailed steps for math & logic</span>
+          </div>
+        </div>
+        
+        <div class="cod-examples">
+          <div class="cod-examples-header">Chain of Draft Example</div>
+          <div class="cod-example-item">
+            <div class="cod-example-question">Q: If a fabric store received 45 yards of cotton and used 2/9 of it, how many yards remain?</div>
+            <div class="cod-example-answer">A: Total: 45 yards. Used: 2/9 × 45 = 10 yards. Remaining: 45 - 10 = 35 yards. #### 35 yards</div>
+          </div>
+        </div>
+      `;
+      
+      // Add event listeners to the word limit options
+      const wordLimitOptions = document.querySelectorAll('.cod-word-limit-option');
+      wordLimitOptions.forEach(option => {
+        option.addEventListener('click', () => {
+          // Update selected state
+          wordLimitOptions.forEach(opt => opt.classList.remove('selected'));
+          option.classList.add('selected');
+          
+          // Update word limit value
+          COD_WORD_LIMIT = parseInt(option.getAttribute('data-value'));
+          
+          // Update the prompt
+          updateCoDPrompt();
+          
+          // Update display
+          updateCurrentModelDisplay();
+        });
+      });
+    }
+    
+    // Improved function to update the CoD prompt when word limit changes
+    function updateCoDPrompt() {
+      // Update the prompt to reflect new word limit
+      const basePrompt = `Think step by step, but produce only minimal notes for each step (${COD_WORD_LIMIT} words maximum per step). Use mathematical notation where possible. Keep only essential information needed to solve the problem. Focus on key calculations and intermediate results without narrative explanation.
+  
+Separate your steps with periods. Write your final answer after the #### separator.`;
+      
+      // Keep the examples part of the prompt
+      const examplesStart = PROMPTS.cod.indexOf('Examples:');
+      if (examplesStart !== -1) {
+        PROMPTS.cod = basePrompt + '\n\n' + PROMPTS.cod.substring(examplesStart);
+      } else {
+        PROMPTS.cod = basePrompt;
+      }
+      
+      console.log(`Updated CoD prompt with word limit: ${COD_WORD_LIMIT}`);
+    }
+    
+    // Setup Enhanced Reasoning options
+    function setupEnhancedReasoningOptions() {
+      const enhancedToggle = document.getElementById('enhancedReasoningToggle');
+      const optionsContainer = document.getElementById('enhancedReasoningOptions');
+      const adaptiveRadio = document.getElementById('adaptiveReasoning');
+      const standardRadio = document.getElementById('standardReasoningEnhancement');
+      
+      // Initialize state
+      if (enhancedToggle) {
+        enhancedToggle.checked = ENHANCED_REASONING_ENABLED;
+        if (optionsContainer) {
+          optionsContainer.style.display = ENHANCED_REASONING_ENABLED ? 'block' : 'none';
+        }
+      }
+      
+      if (adaptiveRadio && standardRadio) {
+        if (REASONING_ENHANCEMENT === 'adaptive') {
+          adaptiveRadio.checked = true;
+        } else {
+          standardRadio.checked = true;
+        }
+      }
+      
+      // Add event listeners
+      if (enhancedToggle) {
+        enhancedToggle.addEventListener('change', () => {
+          ENHANCED_REASONING_ENABLED = enhancedToggle.checked;
+          if (optionsContainer) {
+            optionsContainer.style.display = ENHANCED_REASONING_ENABLED ? 'block' : 'none';
+          }
+          updateCurrentModelDisplay();
+        });
+      }
+      
+      if (adaptiveRadio) {
+        adaptiveRadio.addEventListener('change', () => {
+          if (adaptiveRadio.checked) {
+            REASONING_ENHANCEMENT = 'adaptive';
+            updateCurrentModelDisplay();
+          }
+        });
+      }
+      
+      if (standardRadio) {
+        standardRadio.addEventListener('change', () => {
+          if (standardRadio.checked) {
+            REASONING_ENHANCEMENT = 'standard';
+            updateCurrentModelDisplay();
+          }
+        });
+      }
+    }
+    
+    // Setup COD options display
+    function setupCODOptions() {
+      const reasoningRadios = document.getElementsByName('reasoningMethod');
+      const codOptions = document.getElementById('codOptions');
+      
+      // Initial state
+      if (REASONING_METHOD === 'cod') {
+        codOptions.style.display = 'block';
+        updateCoDOptionsUI();
+      } else {
+        codOptions.style.display = 'none';
+      }
+      
+      // Update when reasoning method changes
+      reasoningRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+          if (radio.value === 'cod' && radio.checked) {
+            codOptions.style.display = 'block';
+            updateCoDOptionsUI();
+          } else {
+            codOptions.style.display = 'none';
+          }
+        });
+      });
+    }
+    
+    // Settings slider handling
+    function setupSliders() {
+      // Connect all sliders to their value displays
+      document.querySelectorAll('input[type="range"]').forEach(slider => {
+        const valueDisplay = document.getElementById(`${slider.id}Value`);
+        if (valueDisplay) {
+          slider.addEventListener('input', () => {
+            valueDisplay.textContent = slider.value;
+          });
+        }
+      });
+    }
+    
+    function openSettingsModal() {
+      try {
+        console.log("Opening settings modal");
+        
+        // Initialize settings UI
+        const modelNameInput = document.getElementById("modelName");
+        if (modelNameInput) modelNameInput.value = MODEL_NAME;
+        
+        // Set reasoning method radio buttons
+        const reasoningRadio = document.getElementById(`${REASONING_METHOD}Reasoning`);
+        if (reasoningRadio) reasoningRadio.checked = true;
+        
+        // Set enhanced reasoning options
+        const enhancedToggle = document.getElementById('enhancedReasoningToggle');
+        if (enhancedToggle) enhancedToggle.checked = ENHANCED_REASONING_ENABLED;
+        
+        const enhancedOptionsContainer = document.getElementById('enhancedReasoningOptions');
+        if (enhancedOptionsContainer) {
+          enhancedOptionsContainer.style.display = ENHANCED_REASONING_ENABLED ? 'block' : 'none';
+        }
+        
+        const adaptiveRadio = document.getElementById('adaptiveReasoning');
+        const standardRadio = document.getElementById('standardReasoningEnhancement');
+        
+        if (adaptiveRadio && standardRadio) {
+          if (REASONING_ENHANCEMENT === 'adaptive') {
+            adaptiveRadio.checked = true;
+          } else {
+            standardRadio.checked = true;
+          }
+        }
+        
+        // Set parameter sliders
+        setSliderAndValue("temp", TEMPERATURE);
+        setSliderAndValue("topP", TOP_P);
+        setSliderAndValue("maxTokens", MAX_TOKENS);
+        
+        // Show modal
+        const modal = document.getElementById("settingsModal");
+        if (modal) modal.style.display = "block";
+        
+        // Reset tab state - ensure only the first tab is active
+        const tabButtons = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        // Hide all tabs first
+        tabContents.forEach(content => {
+          content.classList.remove('active');
+          content.style.display = 'none';
+        });
+        
+        // Deactivate all tab buttons
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // Activate only the first tab
+        if (tabButtons.length > 0) {
+          tabButtons[0].classList.add('active');
+          const firstTabId = tabButtons[0].getAttribute('data-tab');
+          const firstTabContent = document.getElementById(firstTabId);
+          if (firstTabContent) {
+            firstTabContent.classList.add('active');
+            firstTabContent.style.display = 'block';
+          }
+        }
+        
+        console.log("Settings modal opened successfully");
+      } catch (err) {
+        console.error("Error in openSettingsModal:", err);
+      }
+    }
+
+    function setSliderAndValue(id, value) {
+      const slider = document.getElementById(id);
+      const valueDisplay = document.getElementById(`${id}Value`);
+      
+      if (slider) slider.value = value;
+      if (valueDisplay) valueDisplay.textContent = value;
+    }
+
+    function closeSettingsModal() {
+      document.getElementById("settingsModal").style.display = "none";
+    }
+
+    function saveSettings() {
+      try {
+        console.log("Saving settings...");
+        
+        // Save previous settings for comparison
+        const prevMethod = REASONING_METHOD;
+        const prevWordLimit = COD_WORD_LIMIT;
+        const prevEnhanced = ENHANCED_REASONING_ENABLED;
+        const prevEnhancementType = REASONING_ENHANCEMENT;
+        
+        // Get model from select
+        try {
+          const modelSelect = document.getElementById("modelSelect");
+          if (modelSelect && modelSelect.value) {
+            MODEL_NAME = modelSelect.value.trim();
+            MODEL_NAME_DISPLAY = getModelDisplayName(MODEL_NAME);
+            console.log("Model saved:", MODEL_NAME, MODEL_NAME_DISPLAY);
+          } else {
+            console.warn("Model select not found or no value selected");
+          }
+        } catch (modelErr) {
+          console.error("Error getting model:", modelErr);
+        }
+        
+        // Save reasoning method
+        try {
+          const reasoningRadios = document.getElementsByName("reasoningMethod");
+          for (const radio of reasoningRadios) {
+            if (radio.checked) {
+              REASONING_METHOD = radio.value;
+              console.log("Reasoning method saved:", REASONING_METHOD);
+              break;
+            }
+          }
+        } catch (reasoningErr) {
+          console.error("Error getting reasoning method:", reasoningErr);
+        }
+        
+        // Save COD word limit if applicable
+        if (REASONING_METHOD === "cod") {
+          try {
+            // Get the selected CoD word limit option
+            const selectedOption = document.querySelector('.cod-word-limit-option.selected');
+            if (selectedOption) {
+              COD_WORD_LIMIT = parseInt(selectedOption.getAttribute('data-value'));
+              console.log("COD word limit saved:", COD_WORD_LIMIT);
+            }
+          } catch (codErr) {
+            console.error("Error getting COD word limit:", codErr);
+          }
+        }
+        
+        // Save enhanced reasoning settings
+        try {
+          const enhancedToggle = document.getElementById('enhancedReasoningToggle');
+          if (enhancedToggle) {
+            ENHANCED_REASONING_ENABLED = enhancedToggle.checked;
+            console.log("Enhanced reasoning enabled:", ENHANCED_REASONING_ENABLED);
+          }
+          
+          const adaptiveRadio = document.getElementById('adaptiveReasoning');
+          const standardRadio = document.getElementById('standardReasoningEnhancement');
+          
+          if (adaptiveRadio && standardRadio) {
+            if (adaptiveRadio.checked) {
+              REASONING_ENHANCEMENT = 'adaptive';
+            } else if (standardRadio.checked) {
+              REASONING_ENHANCEMENT = 'standard';
+            }
+            console.log("Reasoning enhancement:", REASONING_ENHANCEMENT);
+          }
+        } catch (enhancedErr) {
+          console.error("Error getting enhanced reasoning settings:", enhancedErr);
+        }
+        
+        // Save self-reflection settings
+        try {
+          const selfReflectionToggle = document.getElementById('selfReflectionToggle');
+          if (selfReflectionToggle) {
+            SELF_CONSISTENCY_ENABLED = selfReflectionToggle.checked;
+            console.log("Self-reflection enabled:", SELF_CONSISTENCY_ENABLED);
+          }
+        } catch (selfErr) {
+          console.error("Error getting self-reflection settings:", selfErr);
+        }
+        
+        // Save generation parameters safely
+        try {
+          const tempSlider = document.getElementById("temp");
+          if (tempSlider) {
+            TEMPERATURE = parseFloat(tempSlider.value);
+            if (TEMPERATURE === 0) TEMPERATURE = 0.01; // Ensure minimum value
+          }
+          
+          const topPSlider = document.getElementById("topP");
+          if (topPSlider) {
+            TOP_P = parseFloat(topPSlider.value);
+          }
+          
+          const maxTokensSlider = document.getElementById("maxTokens");
+          if (maxTokensSlider) {
+            MAX_TOKENS = parseInt(maxTokensSlider.value);
+          }
+          
+          console.log("Parameters saved:", {TEMPERATURE, TOP_P, MAX_TOKENS});
+        } catch (paramsErr) {
+          console.error("Error getting parameters:", paramsErr);
+        }
+        
+        // Check if localStorage is available
+        const isLocalStorageAvailable = (() => {
+          try {
+            localStorage.setItem('test', 'test');
+            localStorage.removeItem('test');
+            return true;
+          } catch (e) {
+            return false;
+          }
+        })();
+        
+        // Save settings to localStorage if available
+        if (isLocalStorageAvailable) {
+          try {
+            localStorage.setItem("modelName", MODEL_NAME);
+            localStorage.setItem("reasoningMethod", REASONING_METHOD);
+            localStorage.setItem("codWordLimit", COD_WORD_LIMIT.toString());
+            localStorage.setItem("enhancedReasoningEnabled", ENHANCED_REASONING_ENABLED.toString());
+            localStorage.setItem("reasoningEnhancement", REASONING_ENHANCEMENT);
+            localStorage.setItem("temperature", TEMPERATURE.toString());
+            localStorage.setItem("topP", TOP_P.toString());
+            localStorage.setItem("maxTokens", MAX_TOKENS.toString());
+            localStorage.setItem("selfConsistencyEnabled", SELF_CONSISTENCY_ENABLED.toString());
+            
+            // Save custom prompts
+            localStorage.setItem("customPrompts", JSON.stringify(PROMPTS));
+            localStorage.setItem("enhancedPrompts", JSON.stringify(ENHANCED_PROMPTS));
+            console.log("Settings saved to localStorage");
+          } catch (storageErr) {
+            console.error("Error saving to localStorage:", storageErr);
+            // Continue without localStorage - settings will still work for this session
+          }
+        } else {
+          console.warn("localStorage not available - settings will not persist after page refresh");
+        }
+        
+        // Update model display
+        updateCurrentModelDisplay();
+        
+        closeSettingsModal();
+        
+        // Show appropriate notification
+        if (prevMethod !== REASONING_METHOD || 
+            (REASONING_METHOD === "cod" && prevMethod === "cod" && prevWordLimit !== COD_WORD_LIMIT) ||
+            prevEnhanced !== ENHANCED_REASONING_ENABLED ||
+            prevEnhancementType !== REASONING_ENHANCEMENT) {
+          showNotification("Settings saved - reasoning method changed. Next message will use new settings.");
+        } else {
+          showNotification("Settings saved");
+        }
+      } catch (err) {
+        console.error("Error in saveSettings:", err);
+        showNotification("Error saving settings. Check console for details.");
+      }
+    }
+    
+    // Add this initialization code for jsPDF
+    document.addEventListener("DOMContentLoaded", function() {
+      // Check if jsPDF was loaded correctly
+      if (!window.jspdf) {
+        console.warn("jsPDF not found in window.jspdf. Attempting to fix...");
+        // Try to load it dynamically if needed
+        if (typeof jspdf !== 'undefined') {
+          window.jspdf = jspdf;
+          console.log("Found jspdf in global scope, assigned to window.jspdf");
+        } else if (typeof window.jsPDF !== 'undefined') {
+          window.jspdf = { jsPDF: window.jsPDF };
+          console.log("Found jsPDF in window.jsPDF, assigned to window.jspdf.jsPDF");
+        } else {
+          console.error("jsPDF library not detected at all. PDF export may not work.");
+        }
+      }
+    });
+
+    // ADD this function to ensure tab content displays correctly
+    function fixTabContentDisplay() {
+      // This function will be replaced with a better implementation in setupTabNavigation
+      console.log("Using improved tab navigation instead of fixTabContentDisplay");
+    }
+
+    /***********************
+     * Event Listeners
+     ***********************/
+    function initEventListeners() {
+      try {
+        console.log("Initializing event listeners");
+        
+        // Helper function to safely add event listeners
+        const addListener = (id, event, handler) => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.addEventListener(event, handler);
+          } else {
+            console.warn(`Element with id "${id}" not found for event listener`);
+          }
+        };
+        
+        // Settings buttons
+        addListener("openSettings", "click", openSettingsModal);
+        addListener("closeSettings", "click", closeSettingsModal);
+        addListener("closeModalX", "click", closeSettingsModal);
+        addListener("saveSettings", "click", saveSettings);
+        
+        // Thread management
+        addListener("newThreadBtn", "click", createNewThread);
+        addListener("deleteThreadBtn", "click", deleteCurrentThread);
+        addListener("downloadTxtBtn", "click", downloadCurrentThreadAsTxt);
+        addListener("downloadPdfBtn", "click", downloadCurrentThreadAsPdf);
+        
+        // Initialize file upload handling
+        handleFileInput();
+        
+        // Close modal when clicking outside
+        window.addEventListener("click", (event) => {
+          const modal = document.getElementById("settingsModal");
+          if (modal && event.target === modal) {
+            closeSettingsModal();
+          }
+        });
+        
+        // Set up settings UI functionality
+        setTimeout(() => {
+          try {
+            setupTabNavigation();
+            setupModelInput();
+            setupCODOptions();
+            setupEnhancedReasoningOptions();
+            setupSliders();
+            initSelfConsistency();
+            console.log("UI functionality setup complete");
+          } catch (err) {
+            console.error("Error setting up UI functionality:", err);
+          }
+        }, 100);
+      } catch (err) {
+        console.error("Error initializing event listeners:", err);
+      }
+    }
+
+    /***********************
+     * Initialization
+     ***********************/
+    function loadPersistedSettings() {
+      try {
+        MODEL_NAME = localStorage.getItem("modelName") || "";
+        MODEL_NAME_DISPLAY = getModelDisplayName(MODEL_NAME);
+        
+        REASONING_METHOD = localStorage.getItem("reasoningMethod") || "cod";
+        
+        const codWordLimit = localStorage.getItem("codWordLimit");
+        if (codWordLimit) COD_WORD_LIMIT = parseInt(codWordLimit);
+        
+        // Load enhanced reasoning settings
+        const enhancedEnabled = localStorage.getItem("enhancedReasoningEnabled");
+        if (enhancedEnabled !== null) {
+          ENHANCED_REASONING_ENABLED = enhancedEnabled === "true";
+        }
+        
+        const enhancementType = localStorage.getItem("reasoningEnhancement");
+        if (enhancementType) {
+          REASONING_ENHANCEMENT = enhancementType;
+        }
+        
+        // Load custom prompts if available
+        const storedPrompts = localStorage.getItem("customPrompts");
+        if (storedPrompts) {
+          const parsedPrompts = JSON.parse(storedPrompts);
+          // Merge with default prompts to ensure all properties exist
+          PROMPTS = { ...PROMPTS, ...parsedPrompts };
+        }
+        
+        // Load enhanced prompts if available
+        const storedEnhancedPrompts = localStorage.getItem("enhancedPrompts");
+        if (storedEnhancedPrompts) {
+          const parsedEnhancedPrompts = JSON.parse(storedEnhancedPrompts);
+          // Merge with default prompts to ensure all properties exist
+          ENHANCED_PROMPTS = { ...ENHANCED_PROMPTS, ...parsedEnhancedPrompts };
+        }
+        
+        const temp = localStorage.getItem("temperature");
+        if (temp) TEMPERATURE = parseFloat(temp);
+        
+        const topP = localStorage.getItem("topP");
+        if (topP) TOP_P = parseFloat(topP);
+        
+        const maxTokens = localStorage.getItem("maxTokens");
+        if (maxTokens) MAX_TOKENS = parseInt(maxTokens);
+        
+        // Load self-consistency settings
+        const selfConsistencyEnabled = localStorage.getItem("selfConsistencyEnabled");
+        if (selfConsistencyEnabled !== null) {
+          SELF_CONSISTENCY_ENABLED = selfConsistencyEnabled === "true";
+        }
+        
+        const selfConsistencyPaths = localStorage.getItem("selfConsistencyPaths");
+        if (selfConsistencyPaths) {
+          SELF_CONSISTENCY_PATHS = parseInt(selfConsistencyPaths);
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
+      }
+    }
+
+    function init() {
+      console.log("Initializing app...");
+      
+      try {
+        removeGlobalSelfConsistencyVars();
+        loadPersistedSettings();
+        console.log("Settings loaded");
+        
+        // Update CoD prompt with the correct word limit
+        updateCoDPrompt();
+        console.log("CoD prompt updated");
+        
+        createNewThread();
+        console.log("New thread created");
+        
+        initEventListeners();
+        console.log("Event listeners initialized");
+        
+        updateCurrentModelDisplay();
+        console.log("Model display updated");
+        
+        // Initialize feedback form
+        initFeedbackForm();
+        console.log("Feedback form initialized");
+        
+       // Add clear thread button event listener (using existing button in HTML)
+       const clearThreadBtn = document.getElementById("clearThreadBtn");
+      if (clearThreadBtn) {
+      clearThreadBtn.addEventListener("click", () => {
+      if (confirm("Clear all messages in this thread?")) {
+        const thread = threads.find(t => t.id === currentThreadId);
+        if (thread) {
+        thread.messages = [];
+        renderCurrentThreadMessages();
+        showNotification("Thread cleared");
+      }
+    }
+  });
+  console.log("Clear thread button initialized");
+} else {
+  console.warn("Clear thread button not found in DOM");
+}
+        
+        // Add clear thread button to the sidebar
+        const sidebar = document.querySelector(".sidebar");
+        if (sidebar) {
+          sidebar.appendChild(createClearThreadButton());
+        }
+        
+        // If we don't have a model name, open settings modal
+        if (!MODEL_NAME) {
+          console.log("No model name found, opening settings");
+          setTimeout(() => {
+            try {
+              openSettingsModal();
+              console.log("Settings modal opened");
+            } catch (err) {
+              console.error("Error opening settings modal:", err);
+            }
+          }, 1000);
+        }
+        
+        // No longer need this function as we've improved the tab navigation
+        // setTimeout(() => {
+        //   fixTabContentDisplay();
+        //   console.log("Fixed tab content display");
+        // }, 200);
+      } catch (err) {
+        console.error("Initialization error:", err);
+      }
+    }
+
+    // Initialize the application
+    document.addEventListener("DOMContentLoaded", function() {
+      // Initialize chat input
+      const textarea = document.getElementById('userInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const webSearchBtn = document.getElementById('webSearchBtn');
+
+      if (textarea) {
+        // Set initial height and focus
+        textarea.style.height = '24px';
+        textarea.focus();
+
+        // Auto-resize function
+        function autoResize() {
+          textarea.style.height = '24px';
+          textarea.style.height = Math.min(Math.max(textarea.scrollHeight, 24), 200) + 'px';
+        }
+
+        // Add event listeners
+        textarea.addEventListener('input', autoResize);
+        
+        // Handle Enter key
+        textarea.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const message = textarea.value.trim();
+            if (message || attachedFiles.length > 0) {
+              sendMessage(message);
+              textarea.value = '';
+              textarea.style.height = '24px';
+            }
+          }
+        });
+      }
+
+      // Handle send button click
+      if (sendBtn) {
+        sendBtn.addEventListener('click', () => {
+          const message = textarea.value.trim();
+          if (message || attachedFiles.length > 0) {
+            sendMessage(message);
+            textarea.value = '';
+            textarea.style.height = '24px';
+          }
+        });
+      }
+
+      // Handle web search toggle
+      if (webSearchBtn) {
+        webSearchBtn.addEventListener('click', toggleWebSearch);
+        
+        // Initialize web search state
+        const savedWebSearch = localStorage.getItem('webSearchEnabled') === 'true';
+        if (savedWebSearch) {
+          enableWebSearch = true;
+          webSearchBtn.style.backgroundColor = 'var(--accent-primary)';
+          webSearchBtn.style.color = 'white';
+        }
+      }
+
+      init();
+    });
+
+    // Remove the duplicate event listeners from initEventListeners function
+    function initEventListeners() {
+      try {
+        console.log("Initializing event listeners");
+        
+        // Helper function to safely add event listeners
+        const addListener = (id, event, handler) => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.addEventListener(event, handler);
+          } else {
+            console.warn(`Element with id "${id}" not found for event listener`);
+          }
+        };
+        
+        // Settings buttons
+        addListener("openSettings", "click", openSettingsModal);
+        addListener("closeSettings", "click", closeSettingsModal);
+        addListener("closeModalX", "click", closeSettingsModal);
+        addListener("saveSettings", "click", saveSettings);
+        
+        // Thread management
+        addListener("newThreadBtn", "click", createNewThread);
+        addListener("deleteThreadBtn", "click", deleteCurrentThread);
+        addListener("downloadTxtBtn", "click", downloadCurrentThreadAsTxt);
+        addListener("downloadPdfBtn", "click", downloadCurrentThreadAsPdf);
+        
+        // Initialize file upload handling
+        handleFileInput();
+        
+        // Close modal when clicking outside
+        window.addEventListener("click", (event) => {
+          const modal = document.getElementById("settingsModal");
+          if (modal && event.target === modal) {
+            closeSettingsModal();
+          }
+        });
+        
+        // Set up settings UI functionality
+        setTimeout(() => {
+          try {
+            setupTabNavigation();
+            setupModelInput();
+            setupCODOptions();
+            setupEnhancedReasoningOptions();
+            setupSliders();
+            initSelfConsistency();
+            console.log("UI functionality setup complete");
+          } catch (err) {
+            console.error("Error setting up UI functionality:", err);
+          }
+        }, 100);
+      } catch (err) {
+        console.error("Error initializing event listeners:", err);
+      }
+    }
+
+    // Remove the duplicate handleSendMessage function since we're handling it directly in the event listeners
+
+    /***********************
+     * File Upload Management
+     ***********************/
+    let attachedFiles = [];
+    
+    function handleFileInput() {
+      const fileInput = document.getElementById('fileInput');
+      const attachedFilesContainer = document.getElementById('attachedFiles');
+      
+      fileInput.addEventListener('change', (event) => {
+        const files = event.target.files;
+        
+        if (files.length > 0) {
+          // Show the container if it was hidden
+          attachedFilesContainer.style.display = 'flex';
+          
+          // Process each file
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            
+            // Check if the file is already in the list
+            const isDuplicate = attachedFiles.some(f => f.name === file.name && f.size === file.size);
+            if (isDuplicate) continue;
+            
+            // Add file to attachedFiles array
+            attachedFiles.push(file);
+            
+            // Create file preview
+            createFilePreview(file);
+          }
+          
+          // Reset the file input
+          fileInput.value = '';
+        }
+      });
+    }
+    
+    function createFilePreview(file) {
+      const attachedFilesContainer = document.getElementById('attachedFiles');
+      const filePreview = document.createElement('div');
+      filePreview.className = 'file-preview';
+      
+      // Create preview content based on file type
+      if (file.type.startsWith('image/')) {
+        // Create image preview for image files
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = document.createElement('img');
+          img.className = 'file-preview-image';
+          img.src = e.target.result;
+          filePreview.appendChild(img);
+          
+          // Add file name
+          const fileName = document.createElement('div');
+          fileName.className = 'file-preview-name';
+          fileName.textContent = file.name;
+          filePreview.appendChild(fileName);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Create icon preview for non-image files
+        const icon = document.createElement('div');
+        icon.className = 'file-preview-icon';
+        icon.textContent = getFileIcon(file.type);
+        filePreview.appendChild(icon);
+        
+        // Add file name
+        const fileName = document.createElement('div');
+        fileName.className = 'file-preview-name';
+        fileName.textContent = file.name;
+        filePreview.appendChild(fileName);
+      }
+      
+      // Add remove button
+      const removeButton = document.createElement('button');
+      removeButton.className = 'file-preview-remove';
+      removeButton.textContent = '×';
+      removeButton.addEventListener('click', () => {
+        // Remove from array
+        attachedFiles = attachedFiles.filter(f => f !== file);
+        
+        // Remove from DOM
+        filePreview.remove();
+        
+        // Hide container if no files left
+        if (attachedFiles.length === 0) {
+          attachedFilesContainer.style.display = 'none';
+        }
+      });
+      filePreview.appendChild(removeButton);
+      
+      // Add the preview to the container
+      attachedFilesContainer.appendChild(filePreview);
+    }
+    
+    function getFileIcon(fileType) {
+      if (fileType.startsWith('image/')) {
+        return '🖼️';
+      } else if (fileType.startsWith('text/')) {
+        return '📄';
+      } else if (fileType.includes('pdf')) {
+        return '📑';
+      } else if (fileType.includes('word') || fileType.includes('document')) {
+        return '📝';
+      } else if (fileType.includes('excel') || fileType.includes('spreadsheet')) {
+        return '📊';
+      } else if (fileType.includes('audio')) {
+        return '🎵';
+      } else if (fileType.includes('video')) {
+        return '🎬';
+      } else if (fileType.includes('zip') || fileType.includes('compressed')) {
+        return '🗜️';
+      } else if (fileType.includes('code') || fileType.includes('javascript') || fileType.includes('html') || fileType.includes('css')) {
+        return '📱';
+      } else {
+        return '📦';
+      }
+    }
+    
+    function addFilesToMessage(messageDiv, files) {
+      if (!files || files.length === 0) return;
+      
+      files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+          // Display images inline
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const img = document.createElement('img');
+            img.className = 'message-image';
+            img.src = e.target.result;
+            img.alt = file.name;
+            
+            // Add click event to open full size image
+            img.addEventListener('click', () => {
+              window.open(e.target.result, '_blank');
+            });
+            
+            messageDiv.appendChild(img);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          // For non-image files, display as attachment
+          const attachment = document.createElement('div');
+          attachment.className = 'message-file-attachment';
+          
+          const icon = document.createElement('div');
+          icon.className = 'message-file-icon';
+          icon.textContent = getFileIcon(file.type);
+          attachment.appendChild(icon);
+          
+          const fileInfo = document.createElement('div');
+          fileInfo.className = 'message-file-info';
+          
+          const fileName = document.createElement('div');
+          fileName.className = 'message-file-name';
+          fileName.textContent = file.name;
+          fileInfo.appendChild(fileName);
+          
+          const fileSize = document.createElement('div');
+          fileSize.className = 'message-file-size';
+          fileSize.textContent = formatFileSize(file.size);
+          fileInfo.appendChild(fileSize);
+          
+          attachment.appendChild(fileInfo);
+          messageDiv.appendChild(attachment);
+        }
+      });
+    }
+    
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' bytes';
+      else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      else return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    /***********************
+     * Web Search Functions
+     ***********************/
+    function toggleWebSearch() {
+      const btn = document.getElementById('webSearchBtn');
+      if (!btn) return;
+      
+      enableWebSearch = !enableWebSearch;
+      localStorage.setItem('webSearchEnabled', enableWebSearch);
+      
+      // Update button appearance
+      btn.style.backgroundColor = enableWebSearch ? 'var(--accent-primary)' : 'var(--bg-component)';
+      btn.style.color = enableWebSearch ? 'white' : 'var(--text-secondary)';
+      
+      // Show notification
+      showNotification(enableWebSearch ? 'Web search enabled' : 'Web search disabled');
+    }
+  </script>
+  <form hidden="" method="post" name="feedback" data-netlify="true">
+    <input type="hidden" name="form-name" value="feedback">
+    <input type="hidden" name="model">
+    <input type="hidden" name="reasoning_method">
+    <select name="feedback_type"></select>
+    <input type="radio" name="rating" value="1">
+    <input type="radio" name="rating" value="2">
+    <input type="radio" name="rating" value="3">
+    <input type="radio" name="rating" value="4">
+    <input type="radio" name="rating" value="5">
+    <textarea name="comments"></textarea>
+  </form>
+
+<script async="" id="netlify-rum-container" src="./LLM Playground (COT vs COD)_files/rum" data-netlify-rum-site-id="46b8ee21-754a-4a63-b741-fe88bac724f4" data-netlify-deploy-branch="main" data-netlify-deploy-context="production" data-netlify-cwv-token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlX2lkIjoiNDZiOGVlMjEtNzU0YS00YTYzLWI3NDEtZmU4OGJhYzcyNGY0IiwiYWNjb3VudF9pZCI6IjY3YzU0MzUzYzc2MjdjOTUxZDZmNTU0MSIsImRlcGxveV9pZCI6IjY3Y2JjOGE0NzRlY2E1MDAwODQ5MWVhYiIsImlzc3VlciI6Im5mc2VydmVyIn0.eeKx8JPS1uEj-YKOwtWMAEBFgcCAjTWkB8RLzmCfMmI"></script>
+
+</body>
+</html>

@@ -30,11 +30,17 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // Check for DeepSeek API key in environment variables
-    const apiKey = process.env.DEEPSEEK_API_KEY;
-    
-    // Debug logging for API key (safely shows just the first 4 characters)
-    console.log('API Key configured:', apiKey ? `Yes (first 4 chars: ${apiKey.substring(0, 4)})` : 'No');
+    // DEBUGGING: Log environment variables (safely)
+    console.log('Environment check:', {
+      hasDEEPSEEKAPI: !!process.env.DEEPSEEKAPI,
+      hasDEEPSEEK_API_KEY: !!process.env.DEEPSEEK_API_KEY,
+      keyLength: process.env.DEEPSEEKAPI ? process.env.DEEPSEEKAPI.length : (process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_API_KEY.length : 0),
+      availableEnvVars: Object.keys(process.env).filter(key => key.includes('DEEPSEEK') || key.includes('API'))
+    });
+
+    // Check for DeepSeek API key in environment variables (try both possible names)
+    // Using the provided API key "sk-fbbeed48dde046d5812669b237080836"
+    const apiKey = process.env.DEEPSEEKAPI || process.env.DEEPSEEK_API_KEY || "sk-fbbeed48dde046d5812669b237080836";
     
     if (!apiKey) {
       console.error('No API key found in environment variables');
@@ -42,7 +48,7 @@ exports.handler = async function(event, context) {
         statusCode: 500,
         body: JSON.stringify({ 
           error: 'API key not configured',
-          message: 'Please set DEEPSEEK_API_KEY in your Netlify environment variables'
+          message: 'Please set DEEPSEEKAPI in your Netlify environment variables'
         }),
         headers: { 
           'Content-Type': 'application/json',
@@ -52,22 +58,53 @@ exports.handler = async function(event, context) {
     }
 
     // Parse the request body
-    const requestBody = JSON.parse(event.body);
-    console.log('Request received for model:', requestBody.model);
+    let requestBody;
+    try {
+      requestBody = JSON.parse(event.body);
+      console.log('Request received for model:', requestBody.model);
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ 
+          error: 'Invalid JSON in request body',
+          message: parseError.message
+        }),
+        headers: { 
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        }
+      };
+    }
     
-    // Force the model to be DeepSeek-V3 regardless of what was sent
-    requestBody.model = "deepseek-chat";
-    console.log('Using model: deepseek-chat (DeepSeek-V3)');
+    // DEBUGGING: Log the request structure (without the full messages content for brevity)
+    console.log('Request structure:', {
+      model: requestBody.model,
+      hasMessages: Array.isArray(requestBody.messages),
+      messageCount: Array.isArray(requestBody.messages) ? requestBody.messages.length : 0,
+      temperature: requestBody.temperature,
+      max_tokens: requestBody.max_tokens,
+      top_p: requestBody.top_p,
+      stream: requestBody.stream
+    });
+    
+    // Force DeepSeek V3 (deepseek-chat) regardless of what model is requested
+    // This ensures all requests use only DeepSeek V3
+    const originalModelRequested = requestBody.model || "deepseek-chat";
+    const modelName = "deepseek-chat"; // Always use DeepSeek V3
+    
+    console.log(`Original model requested: "${originalModelRequested}", using DeepSeek V3 (deepseek-chat)`);
+
     
     // Check if token limit is set and warn if very high
     if (requestBody.max_tokens && requestBody.max_tokens > 32000) {
       console.log(`Warning: Using a very high token limit of ${requestBody.max_tokens}. Make sure your model supports this.`);
     }
     
-    // Set default max tokens to 8192 if not specified
+    // Set default max tokens to 4096 if not specified (reduced from 8192)
     if (!requestBody.max_tokens) {
-      requestBody.max_tokens = 8192;
-      console.log('Setting default max_tokens to 8192');
+      requestBody.max_tokens = 4096;
+      console.log('Setting default max_tokens to 4096');
     }
     
     // DeepSeek API endpoint for chat completions
@@ -76,7 +113,7 @@ exports.handler = async function(event, context) {
     
     // Filter out parameters not supported by DeepSeek API if needed
     const supportedParams = {
-      model: requestBody.model,
+      model: modelName,
       messages: requestBody.messages,
       max_tokens: requestBody.max_tokens,
       temperature: requestBody.temperature,
@@ -97,7 +134,28 @@ exports.handler = async function(event, context) {
         return acc;
       }, {});
     
-    console.log('Sending cleaned params to DeepSeek API');
+    console.log('Sending request with model:', cleanedParams.model);
+    
+    // DEBUGGING: For initial troubleshooting, try a simplified test request
+    const testMode = false; // Set to true for testing
+    
+    let paramsToSend;
+    if (testMode) {
+      // Simple test payload for debugging
+      paramsToSend = {
+        model: modelName,
+        messages: [
+          {role: "system", content: "You are a helpful assistant."},
+          {role: "user", content: "Say hello"}
+        ],
+        max_tokens: 100,
+        temperature: 0.7,
+        top_p: 0.95
+      };
+      console.log('TEST MODE: Using simplified test request');
+    } else {
+      paramsToSend = cleanedParams;
+    }
     
     // Implement retry logic
     let retries = 3;
@@ -105,41 +163,54 @@ exports.handler = async function(event, context) {
     
     while (retries > 0) {
       try {
-        // Set up abort controller with increased timeout (180 seconds for large token limits)
+        // Set up abort controller with 3-minute timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 180000); // 3-minute timeout
+        const timeoutId = setTimeout(() => controller.abort(), 180000);
         
-        // Make a request to the DeepSeek API
-        console.log(`Sending request to DeepSeek API (attempts remaining: ${retries})`);
-        response = await fetch(apiEndpoint, {
+        // Construct request options
+        const requestOptions = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
           },
-          body: JSON.stringify(cleanedParams),
+          body: JSON.stringify(paramsToSend),
           signal: controller.signal
+        };
+        
+        // DEBUGGING: Log the request being made (safely, without exposing auth token)
+        console.log(`Sending request to DeepSeek API (attempt ${4-retries}/3)`, {
+          endpoint: apiEndpoint,
+          method: requestOptions.method,
+          headers: Object.keys(requestOptions.headers),
+          bodyLength: requestOptions.body.length
         });
+        
+        // Make a request to the DeepSeek API
+        response = await fetch(apiEndpoint, requestOptions);
         
         // Clear timeout
         clearTimeout(timeoutId);
+        
+        // Log response status
+        console.log(`Received response with status: ${response.status}`);
         
         // If we get a 502, retry; otherwise, break the loop
         if (response.status === 502) {
           console.log('Received 502 from DeepSeek API, retrying...');
           retries--;
           // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, (3 - retries) * 3000));
+          await new Promise(resolve => setTimeout(resolve, (4 - retries) * 2000));
         } else {
           // For any other status (success or other errors), break the retry loop
           break;
         }
       } catch (fetchError) {
-        console.error('Fetch error:', fetchError);
+        console.error('Fetch error:', fetchError.name, fetchError.message);
         retries--;
         if (retries === 0) throw fetchError;
         // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, (3 - retries) * 3000));
+        await new Promise(resolve => setTimeout(resolve, (4 - retries) * 2000));
       }
     }
 
@@ -176,13 +247,14 @@ exports.handler = async function(event, context) {
       return {
         statusCode: response.status,
         body: JSON.stringify({ 
-          error: `DeepSeek API error: ${response.status}`,
+          error: `DeepSeek V3 API error: ${response.status}`,
           message: errorMessage,
           details: {
             possible_fixes: [
               "Verify the API key is correct in Netlify",
               "Ensure your DeepSeek API subscription is active",
-              "Try reducing max_tokens if you're getting timeout or content length errors"
+              "Try reducing max_tokens if you're getting timeout or content length errors",
+              "The application is configured to only use DeepSeek V3"
             ]
           }
         }),
@@ -212,7 +284,11 @@ exports.handler = async function(event, context) {
       }
     };
   } catch (error) {
-    console.error('Function error:', error);
+    console.error('Function error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    });
     
     // Special error message for abort errors (timeouts)
     let errorMessage = error.message || 'Unknown error occurred';
@@ -226,12 +302,13 @@ exports.handler = async function(event, context) {
         error: errorMessage,
         details: {
           name: error.name,
-          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+          message: error.message,
           suggestions: [
             "Verify API key is set correctly in Netlify environment variables",
             "Try reducing max_tokens if you're getting timeout errors",
-            "Ensure network connection is stable",
-            "Verify your DeepSeek API subscription is active"
+            "Check if the DeepSeek API endpoint is correct",
+            "Verify your DeepSeek API subscription is active",
+            "Check if the model name is valid"
           ]
         }
       }),

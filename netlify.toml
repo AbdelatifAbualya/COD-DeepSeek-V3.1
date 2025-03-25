@@ -1,0 +1,41 @@
+# Netlify configuration file
+# This file should be in the root of your project
+
+[build]
+  # Directory that contains the deploy-ready HTML files and assets
+  publish = "/"
+  
+  # Directory with the serverless functions
+  functions = "netlify/functions"
+
+# Function settings
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["node-fetch"]
+  included_files = []
+
+# Set function timeout (must be in build.environment) - increased from 300 to 900 for 128k tokens  
+[build.environment]
+  AWS_LAMBDA_FUNCTION_TIMEOUT = "900"
+  # Note: You need to set DEEPSEEK_API_KEY in the Netlify UI environment variables
+
+# Set up chunked uploads for large request bodies
+[build.processing]
+  skip_processing = false
+
+# Increase client side timeouts for long-running functions
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # Increase client-side timeout expectations - increased from 300 to 900
+    X-Function-Timeout = "900"
+    # Increase payload size limits
+    X-Large-Payload = "true"
+    # Increase max request body size (for large inputs with 128k tokens)
+    X-Max-Request-Size = "15mb"
+
+# Properly configured redirect for single-page application
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

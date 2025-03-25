@@ -30,17 +30,8 @@ exports.handler = async function(event, context) {
   }
 
   try {
-    // DEBUGGING: Log environment variables (safely)
-    console.log('Environment check:', {
-      hasDEEPSEEKAPI: !!process.env.DEEPSEEKAPI,
-      hasDEEPSEEK_API_KEY: !!process.env.DEEPSEEK_API_KEY,
-      keyLength: process.env.DEEPSEEKAPI ? process.env.DEEPSEEKAPI.length : (process.env.DEEPSEEK_API_KEY ? process.env.DEEPSEEK_API_KEY.length : 0),
-      availableEnvVars: Object.keys(process.env).filter(key => key.includes('DEEPSEEK') || key.includes('API'))
-    });
-
-    // Check for DeepSeek API key in environment variables (try both possible names)
-    // Using the provided API key "sk-fbbeed48dde046d5812669b237080836"
-    const apiKey = process.env.DEEPSEEKAPI || process.env.DEEPSEEK_API_KEY || "sk-fbbeed48dde046d5812669b237080836";
+    // Check for DeepSeek API key in environment variables
+    const apiKey = process.env.DEEPSEEKAPI || process.env.DEEPSEEK_API_KEY;
     
     if (!apiKey) {
       console.error('No API key found in environment variables');
@@ -77,45 +68,43 @@ exports.handler = async function(event, context) {
       };
     }
     
-    // DEBUGGING: Log the request structure (without the full messages content for brevity)
+    // Log request information
     console.log('Request structure:', {
       model: requestBody.model,
       hasMessages: Array.isArray(requestBody.messages),
       messageCount: Array.isArray(requestBody.messages) ? requestBody.messages.length : 0,
       temperature: requestBody.temperature,
       max_tokens: requestBody.max_tokens,
-      top_p: requestBody.top_p,
-      stream: requestBody.stream
+      top_p: requestBody.top_p
     });
     
-    // Force DeepSeek V3 (deepseek-chat) regardless of what model is requested
-    // This ensures all requests use only DeepSeek V3
+    // Always use DeepSeek V3 regardless of what model is requested
     const originalModelRequested = requestBody.model || "deepseek-chat";
     const modelName = "deepseek-chat"; // Always use DeepSeek V3
     
     console.log(`Original model requested: "${originalModelRequested}", using DeepSeek V3 (deepseek-chat)`);
 
+    // Validate max_tokens - DeepSeek API accepts 1-8192
+    let validatedMaxTokens = 4096; // Default
     
-    // Check if token limit is set and warn if very high
-    if (requestBody.max_tokens && requestBody.max_tokens > 32000) {
-      console.log(`Warning: Using a very high token limit of ${requestBody.max_tokens}. Make sure your model supports this.`);
+    if (requestBody.max_tokens !== undefined) {
+      // Ensure max_tokens is within valid range
+      validatedMaxTokens = Math.min(Math.max(1, requestBody.max_tokens), 8192);
+      
+      if (validatedMaxTokens !== requestBody.max_tokens) {
+        console.log(`Adjusted max_tokens from ${requestBody.max_tokens} to ${validatedMaxTokens} to meet DeepSeek API requirements`);
+      }
     }
     
-    // Set default max tokens to 4096 if not specified (reduced from 8192)
-    if (!requestBody.max_tokens) {
-      requestBody.max_tokens = 4096;
-      console.log('Setting default max_tokens to 4096');
-    }
-    
-    // DeepSeek API endpoint for chat completions
+    // DeepSeek API endpoint
     const apiEndpoint = 'https://api.deepseek.com/v1/chat/completions';
     console.log(`Using DeepSeek API endpoint: ${apiEndpoint}`);
     
-    // Filter out parameters not supported by DeepSeek API if needed
+    // Construct parameters accepted by DeepSeek
     const supportedParams = {
       model: modelName,
       messages: requestBody.messages,
-      max_tokens: requestBody.max_tokens,
+      max_tokens: validatedMaxTokens,
       temperature: requestBody.temperature,
       top_p: requestBody.top_p,
       n: requestBody.n,
@@ -136,36 +125,15 @@ exports.handler = async function(event, context) {
     
     console.log('Sending request with model:', cleanedParams.model);
     
-    // DEBUGGING: For initial troubleshooting, try a simplified test request
-    const testMode = false; // Set to true for testing
-    
-    let paramsToSend;
-    if (testMode) {
-      // Simple test payload for debugging
-      paramsToSend = {
-        model: modelName,
-        messages: [
-          {role: "system", content: "You are a helpful assistant."},
-          {role: "user", content: "Say hello"}
-        ],
-        max_tokens: 100,
-        temperature: 0.7,
-        top_p: 0.95
-      };
-      console.log('TEST MODE: Using simplified test request');
-    } else {
-      paramsToSend = cleanedParams;
-    }
-    
-    // Implement retry logic
+    // Implement retry logic with exponential backoff
     let retries = 3;
     let response;
     
     while (retries > 0) {
       try {
-        // Set up abort controller with 3-minute timeout
+        // Set up abort controller with timeout - 2.5 minutes
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 180000);
+        const timeoutId = setTimeout(() => controller.abort(), 150000);
         
         // Construct request options
         const requestOptions = {
@@ -174,33 +142,28 @@ exports.handler = async function(event, context) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiKey}`
           },
-          body: JSON.stringify(paramsToSend),
+          body: JSON.stringify(cleanedParams),
           signal: controller.signal
         };
         
-        // DEBUGGING: Log the request being made (safely, without exposing auth token)
-        console.log(`Sending request to DeepSeek API (attempt ${4-retries}/3)`, {
-          endpoint: apiEndpoint,
-          method: requestOptions.method,
-          headers: Object.keys(requestOptions.headers),
-          bodyLength: requestOptions.body.length
-        });
+        console.log(`Sending request to DeepSeek API (attempt ${4-retries}/3)`);
         
-        // Make a request to the DeepSeek API
+        // Make request to the DeepSeek API
         response = await fetch(apiEndpoint, requestOptions);
         
         // Clear timeout
         clearTimeout(timeoutId);
         
-        // Log response status
         console.log(`Received response with status: ${response.status}`);
         
-        // If we get a 502, retry; otherwise, break the loop
-        if (response.status === 502) {
-          console.log('Received 502 from DeepSeek API, retrying...');
+        // On 502/503 errors, retry; otherwise, break the loop
+        if (response.status === 502 || response.status === 503) {
+          console.log(`Received ${response.status} from DeepSeek API, retrying...`);
           retries--;
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, (4 - retries) * 2000));
+          // Exponential backoff before retrying
+          const backoffTime = (4 - retries) * 2000;
+          console.log(`Waiting ${backoffTime}ms before retry`);
+          await new Promise(resolve => setTimeout(resolve, backoffTime));
         } else {
           // For any other status (success or other errors), break the retry loop
           break;
@@ -208,9 +171,13 @@ exports.handler = async function(event, context) {
       } catch (fetchError) {
         console.error('Fetch error:', fetchError.name, fetchError.message);
         retries--;
+        
         if (retries === 0) throw fetchError;
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, (4 - retries) * 2000));
+        
+        // Exponential backoff before retrying
+        const backoffTime = (4 - retries) * 2000;
+        console.log(`Waiting ${backoffTime}ms before retry`);
+        await new Promise(resolve => setTimeout(resolve, backoffTime));
       }
     }
 
@@ -230,9 +197,9 @@ exports.handler = async function(event, context) {
         const parsedError = JSON.parse(errorData);
         errorMessage = parsedError.error?.message || 'Unknown API error';
         
-        // Check if the error is related to token limit
-        if (errorMessage.includes('token') && errorMessage.includes('limit')) {
-          errorMessage = `Token limit exceeded. The model may not support ${requestBody.max_tokens || 'the requested'} tokens. Try reducing the max_tokens value.`;
+        // Check for specific errors
+        if (errorMessage.includes('max_tokens')) {
+          errorMessage = `Invalid max_tokens value. The DeepSeek API accepts values between 1 and 8192.`;
         }
       } catch {
         // If parsing fails, use the raw text
@@ -241,20 +208,19 @@ exports.handler = async function(event, context) {
       
       // Special error message for 401 errors
       if (response.status === 401) {
-        errorMessage = "Authentication failed. Please check your DeepSeek API key value in Netlify environment variables.";
+        errorMessage = "Authentication failed. Please check your DeepSeek API key.";
       }
       
       return {
         statusCode: response.status,
         body: JSON.stringify({ 
-          error: `DeepSeek V3 API error: ${response.status}`,
+          error: `DeepSeek API error: ${response.status}`,
           message: errorMessage,
           details: {
             possible_fixes: [
               "Verify the API key is correct in Netlify",
               "Ensure your DeepSeek API subscription is active",
-              "Try reducing max_tokens if you're getting timeout or content length errors",
-              "The application is configured to only use DeepSeek V3"
+              "Try reducing max_tokens if you're getting timeout errors"
             ]
           }
         }),
@@ -265,7 +231,7 @@ exports.handler = async function(event, context) {
       };
     }
 
-    // Parse the response
+    // Parse the successful response
     const data = await response.json();
     console.log('Received successful response from DeepSeek API');
     
@@ -293,7 +259,7 @@ exports.handler = async function(event, context) {
     // Special error message for abort errors (timeouts)
     let errorMessage = error.message || 'Unknown error occurred';
     if (error.name === 'AbortError' || errorMessage.includes('abort')) {
-      errorMessage = "Request timed out. Try reducing the max_tokens value or using a model that supports larger outputs.";
+      errorMessage = "Request timed out. Try reducing the max_tokens value or simplifying your prompt.";
     }
     
     return {
@@ -304,11 +270,9 @@ exports.handler = async function(event, context) {
           name: error.name,
           message: error.message,
           suggestions: [
-            "Verify API key is set correctly in Netlify environment variables",
-            "Try reducing max_tokens if you're getting timeout errors",
-            "Check if the DeepSeek API endpoint is correct",
-            "Verify your DeepSeek API subscription is active",
-            "Check if the model name is valid"
+            "Try reducing max_tokens (8192 maximum)",
+            "Simplify your prompt or use shorter messages",
+            "Try again later if service is experiencing high load"
           ]
         }
       }),

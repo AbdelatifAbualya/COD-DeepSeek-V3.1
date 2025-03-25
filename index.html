@@ -2566,8 +2566,11 @@
     let MODEL_NAME_DISPLAY = "";
     let enableWebSearch = false; // Add web search global variable
     
-    // Server endpoint (Netlify serverless function)
-    const API_PROXY_URL = "/.netlify/functions/api-proxy";
+    // Add both API endpoints - primary and fallback
+    const EDGE_API_URL = "/api/proxy"; // Edge Function (primary)
+    const FALLBACK_API_URL = "/api-fallback/proxy"; // Regular Function (fallback)
+    // Keep the original for backward compatibility
+    const API_PROXY_URL = EDGE_API_URL; // For compatibility
     
     // Reasoning Method
     let REASONING_METHOD = "cod"; // Options: "standard", "cot", "cod"
@@ -2631,11 +2634,13 @@ IMPORTANT: Instead of trying to fit complex reasoning into fewer steps, break yo
 4. Area = 50 × 30.
 5. Area = 1500.
 
+Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
+
 Separate your steps with periods. Write your final answer after the #### separator.
 
 Example of solving a complex problem with sufficient steps:
 Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: speed 60 mph. First segment: time 2h. First segment: distance = 60 × 2. First segment: distance = 120 miles. Second segment: speed 75 mph. Second segment: time 1h. Second segment: distance = 75 × 1. Second segment: distance = 75 miles. Third segment: speed 50 mph. Third segment: time 0.5h. Third segment: distance = 50 × 0.5. Third segment: distance = 25 miles. Total distance: 120 + 75 + 25. Total distance = 220 miles. #### 220 miles`,
+A: First segment: speed 60 mph. First segment: time 2h. First segment: distance = 60 × 2. First segment: distance = 120 miles. Second segment: speed 75 mph. Second segment: time 1h. Second segment: distance = 75 × 1. Second segment: distance = 75 miles. Third segment: speed 50 mph. Third segment: time 0.5h. Third segment: distance = 50 × 0.5. Third segment: distance = 25 miles. Total distance: 120 + 75 + 25. Reflection: Verified all calculations and units match. Each segment's distance correctly computed. #### 220 miles`,
 
       cod10: `Think step by step to solve this complex problem. For each step, use up to 10 words to capture the essential reasoning. Use AS MANY STEPS as needed to fully solve the problem. Include ALL intermediate calculations and logical inferences.
 
@@ -2647,35 +2652,43 @@ When thinking through difficult parts of a problem:
 3. Perform calculations systematically
 4. Check your work at key points
 
+Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
+
 Separate your steps with periods. Write your final answer after the #### separator.
 
 Example of solving a complex problem:
 Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: speed 60 mph for 2 hours. First segment distance calculation: 60 mph × 2h. First segment distance = 120 miles. Second segment: speed 75 mph for 1 hour. Second segment distance calculation: 75 mph × 1h. Second segment distance = 75 miles. Third segment: speed 50 mph for 0.5 hours. Third segment distance calculation: 50 mph × 0.5h. Third segment distance = 25 miles. Need to sum all segment distances. Total distance calculation: 120 + 75 + 25. Total distance traveled = 220 miles. #### 220 miles`,
+A: First segment: speed 60 mph for 2 hours. First segment distance calculation: 60 mph × 2h. First segment distance = 120 miles. Second segment: speed 75 mph for 1 hour. Second segment distance calculation: 75 mph × 1h. Second segment distance = 75 miles. Third segment: speed 50 mph for 0.5 hours. Third segment distance calculation: 50 mph × 0.5h. Third segment distance = 25 miles. Need to sum all segment distances. Total distance calculation: 120 + 75 + 25. Reflection: Verified all time periods sum correctly and speed calculations are accurate. #### 220 miles`,
       
       cod15: `Think step by step to solve this complex problem. For each step, use up to 15 words to capture the essential reasoning, providing more detail for critical steps. Use mathematical notation where helpful but include explanations of your approach at key points.
 
+Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
+
 Separate your steps with periods. Write your final answer after the #### separator.
 
 Example of solving a complex problem:
 Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: The car travels at 60 mph for 2 hours, so distance = 60 × 2 = 120 miles. Second segment: The car increases to 75 mph for 1 hour, so distance = 75 × 1 = 75 miles. Third segment: The car decreases to 50 mph for 0.5 hours, so distance = 50 × 0.5 = 25 miles. Total distance traveled = 120 + 75 + 25 = 220 miles. #### 220 miles`,
+A: First segment: The car travels at 60 mph for 2 hours, so distance = 60 × 2 = 120 miles. Second segment: The car increases to 75 mph for 1 hour, so distance = 75 × 1 = 75 miles. Third segment: The car decreases to 50 mph for 0.5 hours, so distance = 50 × 0.5 = 25 miles. Reflection: Checked all calculations and time periods sum to 3.5 hours total. #### 220 miles`,
       
       cod17: `Think step by step to solve this complex problem. For each step, use up to 17 words to provide clear reasoning, especially for difficult parts. Balance precision and concision, using math notation to save words.
 
+Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
+
 Separate your steps with periods. Write your final answer after the #### separator.
 
 Example of solving a complex problem:
 Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: The car travels at 60 mph for 2 hours, giving distance = 60 × 2 = 120 miles. Second segment: Speed increases to 75 mph for 1 hour, so this segment's distance = 75 miles. Third segment: Speed is 50 mph for 0.5 hours, contributing 50 × 0.5 = 25 miles. Total journey distance = 120 + 75 + 25 = 220 miles. #### 220 miles`,
+A: First segment: The car travels at 60 mph for 2 hours, giving distance = 60 × 2 = 120 miles. Second segment: Speed increases to 75 mph for 1 hour, so this segment's distance = 75 miles. Third segment: Speed is 50 mph for 0.5 hours, contributing 50 × 0.5 = 25 miles. Reflection: Verified all calculations and confirmed total time equals 3.5 hours. #### 220 miles`,
       
       cod20: `Think step by step to solve this complex problem. For each step, use up to 20 words to provide clear reasoning, explaining your approach more thoroughly for the difficult parts of the problem.
 
+Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
+
 Separate your steps with periods. Write your final answer after the #### separator.
 
 Example of solving a complex problem:
 Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: The car travels at 60 mph for 2 hours, so the distance covered in this segment is 60 × 2 = 120 miles. Second segment: The car then increases speed to 75 mph and maintains this for 1 hour, covering 75 × 1 = 75 miles. Third segment: Finally, the car decreases speed to 50 mph for 30 minutes (0.5 hours), covering 50 × 0.5 = 25 miles. Total distance traveled over the entire journey = 120 + 75 + 25 = 220 miles. #### 220 miles`
+A: First segment: The car travels at 60 mph for 2 hours, so the distance covered in this segment is 60 × 2 = 120 miles. Second segment: The car then increases speed to 75 mph and maintains this for 1 hour, covering 75 × 1 = 75 miles. Third segment: Finally, the car decreases speed to 50 mph for 30 minutes (0.5 hours), covering 50 × 0.5 = 25 miles. Reflection: Verified all calculations are correct and time periods sum to 3.5 hours as expected. #### 220 miles`
     };
     
     // Default generation parameters
@@ -3230,6 +3243,17 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           let thinking = content.substring(0, separatorIndex).trim();
           let answer = content.substring(separatorIndex + 4).trim();
           
+          // Check if there's a reflection step and format it specially
+          const reflectionIndex = thinking.toLowerCase().lastIndexOf("reflection:");
+          if (reflectionIndex !== -1) {
+            // Split the thinking into regular steps and reflection
+            const regularSteps = thinking.substring(0, reflectionIndex).trim();
+            const reflectionStep = thinking.substring(reflectionIndex).trim();
+            
+            // Combine them back with special formatting for reflection
+            thinking = regularSteps + "\n\n" + reflectionStep;
+          }
+          
           return {
             content: content,
             thinking: thinking,
@@ -3248,16 +3272,33 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           // Split by periods to identify steps
           const parts = content.split('.');
           if (parts.length > 1) {
-            // Use the last part as the answer and everything else as thinking
-            const lastPart = parts.pop().trim();
-            const thinking = parts.join('.').trim();
+            // Look for reflection step
+            const reflectionIndex = parts.findIndex(part => 
+              part.toLowerCase().trim().startsWith("reflection:")
+            );
+            
+            let thinking = '';
+            let answer = '';
+            
+            if (reflectionIndex !== -1) {
+              // Combine regular steps
+              thinking = parts.slice(0, reflectionIndex).join('.').trim();
+              // Add reflection step with special formatting
+              thinking += "\n\n" + parts[reflectionIndex].trim();
+              // Use remaining parts as answer if any, otherwise use last part
+              answer = parts.slice(reflectionIndex + 1).join('.').trim() || parts[parts.length - 1].trim();
+            } else {
+              // Use the last part as the answer and everything else as thinking
+              answer = parts.pop().trim();
+              thinking = parts.join('.').trim();
+            }
             
             return {
               content: content,
               thinking: thinking,
-              answer: lastPart,
+              answer: answer,
               thinkingWordCount: countWords(thinking),
-              answerWordCount: countWords(lastPart)
+              answerWordCount: countWords(answer)
             };
           }
         }
@@ -3819,98 +3860,187 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
       const messagesForApi = buildMessagesForChat(wordCountRequest);
 
       try {
-        // Create payload for Netlify function
+        // Detect if the messages are too long
+        const totalWords = messagesForApi.reduce((total, msg) => total + countWords(msg.content), 0);
+        const estimatedTokens = totalWords * 1.5; // Rough estimate of tokens from words
+        
+        // If the prompt is large, warn the user
+        if (estimatedTokens > 2000) {
+          console.log(`Large prompt detected (est. ${Math.round(estimatedTokens)} tokens). Reducing max_tokens to avoid timeouts.`);
+        }
+        
+        // Original MAX_TOKENS value
+        const originalMaxTokens = MAX_TOKENS;
+        
+        // For large prompts, reduce the max_tokens to prevent timeouts
+        const adjustedMaxTokens = estimatedTokens > 2000 ? 
+          Math.min(2048, MAX_TOKENS) : MAX_TOKENS;
+        
+        // Create payload for Netlify function with adjusted max_tokens
         const payload = {
           model: MODEL_NAME,
           messages: messagesForApi,
           temperature: TEMPERATURE,
           top_p: TOP_P,
-          max_tokens: MAX_TOKENS,
+          max_tokens: adjustedMaxTokens,
           stream: false
         };
-        
-        console.log(`Sending request to DeepSeek API via Netlify with ${REASONING_METHOD} reasoning ${REASONING_METHOD === "cod" ? `(word limit: ${COD_WORD_LIMIT})` : ""}`);
         
         // Add timestamp to URL to prevent caching
         const timestamp = new Date().getTime();
         const cacheBuster = `?t=${timestamp}`;
         
-        const response = await fetch(`${API_PROXY_URL}${cacheBuster}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
-        });
+        // Set a client-side timeout that's a bit longer than the edge function timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
         
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
+        console.log("Sending request to Edge Function endpoint...");
         
-        const data = await response.json();
-        const botReply = data.choices &&
-                         data.choices[0] &&
-                         data.choices[0].message &&
-                         data.choices[0].message.content;
+        try {
+          // First try: Send request to the Edge Function endpoint
+          const response = await fetch(`${EDGE_API_URL}${cacheBuster}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          
+          // Clear the timeout
+          clearTimeout(timeoutId);
+          
+          // If successful, process the response
+          if (response.ok) {
+            const data = await response.json();
+            const botReply = data.choices &&
+                           data.choices[0] &&
+                           data.choices[0].message &&
+                           data.choices[0].message.content;
 
-        if (botReply) {
-          const trimmedReply = botReply.trim();
+            if (botReply) {
+              const trimmedReply = botReply.trim();
+              
+              // Create response metadata
+              let reasoningInfo = REASONING_METHOD.toUpperCase();
+              if (REASONING_METHOD === "cod") {
+                reasoningInfo += `-${COD_WORD_LIMIT}`;
+              }
+              
+              // Add enhanced reasoning info if used
+              if (ENHANCED_REASONING_ENABLED && 
+                  REASONING_ENHANCEMENT === "adaptive" && 
+                  PROBLEM_COMPLEXITY.complexity === "complex") {
+                reasoningInfo += "-ENHANCED";
+              }
+              
+              // Process bot message to separate thinking and answer parts
+              const processed = processBotMessage(trimmedReply, REASONING_METHOD);
+              
+              thread.messages[placeholderIndex] = {
+                content: trimmedReply,
+                sender: "bot",
+                isPlaceholder: false,
+                timestamp: new Date(),
+                wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
+                reasoningMethod: reasoningInfo,
+                thinking: processed.thinking,
+                answer: processed.answer,
+                thinkingWordCount: processed.thinkingWordCount || 0,
+                answerWordCount: processed.answerWordCount || 0
+              };
+              renderCurrentThreadMessages();
+              return;
+            }
+          } else {
+            // If Edge Function returned an error response, try the fallback
+            console.log(`Edge Function returned error ${response.status}, trying fallback...`);
+            throw new Error(`Edge Function returned status: ${response.status}`);
+          }
+        } catch (edgeError) {
+          // If Edge Function failed completely, try the fallback
+          console.log("Edge Function error, using fallback function:", edgeError.message);
           
-          // Create response metadata
-          let reasoningInfo = REASONING_METHOD.toUpperCase();
-          if (REASONING_METHOD === "cod") {
-            reasoningInfo += `-${COD_WORD_LIMIT}`;
+          // Update placeholder message
+          if (thread.messages[placeholderIndex].isPlaceholder) {
+            thread.messages[placeholderIndex].content = "Edge Function error, trying fallback...";
+            renderCurrentThreadMessages();
           }
           
-          // Add enhanced reasoning info if used
-          if (ENHANCED_REASONING_ENABLED && 
-              REASONING_ENHANCEMENT === "adaptive" && 
-              PROBLEM_COMPLEXITY.complexity === "complex") {
-            reasoningInfo += "-ENHANCED";
+          // Try the fallback serverless function
+          const fallbackResponse = await fetch(`${FALLBACK_API_URL}${cacheBuster}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!fallbackResponse.ok) {
+            throw new Error(`Both endpoints failed. Status: ${fallbackResponse.status}`);
           }
           
-          // Process bot message to separate thinking and answer parts
-          const processed = processBotMessage(trimmedReply, REASONING_METHOD);
-          
-          thread.messages[placeholderIndex] = {
-            content: trimmedReply,
-            sender: "bot",
-            isPlaceholder: false,
-            timestamp: new Date(),
-            wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
-            reasoningMethod: reasoningInfo,
-            thinking: processed.thinking,
-            answer: processed.answer,
-            thinkingWordCount: processed.thinkingWordCount || 0,
-            answerWordCount: processed.answerWordCount || 0
-          };
-        } else {
-          thread.messages[placeholderIndex] = {
-            content: "No valid response received from DeepSeek. Please try again.",
-            sender: "bot",
-            isPlaceholder: false,
-            timestamp: new Date(),
-            wordCount: 0,
-            reasoningMethod: REASONING_METHOD.toUpperCase(),
-            thinking: null,
-            answer: null,
-            thinkingWordCount: 0,
-            answerWordCount: 0
-          };
+          // Process the fallback response
+          const fallbackData = await fallbackResponse.json();
+          const botReply = fallbackData.choices &&
+                         fallbackData.choices[0] &&
+                         fallbackData.choices[0].message &&
+                         fallbackData.choices[0].message.content;
+
+          if (botReply) {
+            const trimmedReply = botReply.trim() + "\n\n*Note: This response was generated using the fallback API endpoint.*";
+            
+            // Create response metadata
+            let reasoningInfo = REASONING_METHOD.toUpperCase();
+            if (REASONING_METHOD === "cod") {
+              reasoningInfo += `-${COD_WORD_LIMIT}`;
+            }
+            
+            // Add enhanced reasoning info if used
+            if (ENHANCED_REASONING_ENABLED && 
+                REASONING_ENHANCEMENT === "adaptive" && 
+                PROBLEM_COMPLEXITY.complexity === "complex") {
+              reasoningInfo += "-ENHANCED";
+            }
+            
+            // Process bot message to separate thinking and answer parts
+            const processed = processBotMessage(trimmedReply, REASONING_METHOD);
+            
+            thread.messages[placeholderIndex] = {
+              content: trimmedReply,
+              sender: "bot",
+              isPlaceholder: false,
+              timestamp: new Date(),
+              wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
+              reasoningMethod: reasoningInfo,
+              thinking: processed.thinking,
+              answer: processed.answer,
+              thinkingWordCount: processed.thinkingWordCount || 0,
+              answerWordCount: processed.answerWordCount || 0
+            };
+          } else {
+            throw new Error("No valid response from fallback endpoint");
+          }
         }
       } catch (error) {
         console.error("Error communicating with API:", error);
         
         let errorMessage = "Error communicating with API: " + error.message;
         
-        if (error.message.includes("401")) {
+        if (error.name === "AbortError") {
+          errorMessage = "Request timed out. Try again with a shorter question or request less detailed responses.";
+        } else if (error.message.includes("401")) {
           errorMessage += "\n\nAuthentication failed. Please check if your DeepSeek API key is properly set in Netlify environment variables.";
         } else if (error.message.includes("429")) {
           errorMessage += "\n\nRate limit exceeded. Please wait a moment before trying again.";
         } else if (error.message.includes("500")) {
           errorMessage += "\n\nServer error. Please try again later.";
+        } else if (error.message.includes("502") || error.message.includes("504")) {
+          errorMessage = "The API took too long to respond. Try asking a simpler question or adjust the max tokens in settings.";
         } else if (error.message.includes("Failed to fetch")) {
           errorMessage += "\n\nCould not connect to the API. Please check your internet connection and try again.";
+        } else if (error.message.includes("Both endpoints failed")) {
+          errorMessage = "Both primary and fallback API endpoints failed. Please try again later.";
         }
         
         thread.messages[placeholderIndex] = {

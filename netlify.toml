@@ -1,40 +1,41 @@
-# Netlify configuration file
+# Netlify configuration file with Edge Functions support
 # This file should be in the root of your project
 
 [build]
   # Directory that contains the deploy-ready HTML files and assets
   publish = "/"
   
-  # Directory with the serverless functions
+  # Directory with the serverless functions (keep as fallback)
   functions = "netlify/functions"
 
-# Function settings
+# Edge Function configuration - primary path
+[[edge_functions]]
+  path = "/api/*"
+  function = "api-proxy"
+
+# Regular functions settings - these remain as fallback
 [functions]
   node_bundler = "esbuild"
   external_node_modules = ["node-fetch"]
   included_files = []
 
-# Set function timeout (must be in build.environment) - increased from 300 to 900 for 128k tokens  
-[build.environment]
-  AWS_LAMBDA_FUNCTION_TIMEOUT = "900"
-  # Note: You need to set DEEPSEEK_API_KEY in the Netlify UI environment variables
-
-# Set up chunked uploads for large request bodies
+# Set up proper content-type handling
 [build.processing]
   skip_processing = false
 
-# Increase client side timeouts for long-running functions
-[[headers]]
-  for = "/*"
-  [headers.values]
-    # Increase client-side timeout expectations - increased from 300 to 900
-    X-Function-Timeout = "900"
-    # Increase payload size limits
-    X-Large-Payload = "true"
-    # Increase max request body size (for large inputs with 128k tokens)
-    X-Max-Request-Size = "15mb"
+# Configure routing for your application - primary path uses Edge Functions
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/edge-functions/api-proxy"
+  status = 200
 
-# Properly configured redirect for single-page application
+# Fallback redirect to the regular function if needed
+[[redirects]]
+  from = "/api-fallback/*"
+  to = "/.netlify/functions/api-proxy"
+  status = 200
+
+# Keep the SPA redirect
 [[redirects]]
   from = "/*"
   to = "/index.html"

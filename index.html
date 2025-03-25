@@ -468,26 +468,17 @@
     
     /* Chain of Draft Step Styling */
     .step {
-      border-left: 2px solid var(--accent-tertiary);
-      padding-left: 12px;
-      margin-bottom: 10px;
-      color: var(--text-secondary);
-    }
-    
-    .cod-step {
       display: flex;
       align-items: flex-start;
-      padding: 10px 12px;
-      margin-bottom: 12px !important;
-      border-left: none !important;
-      background-color: rgba(44, 59, 79, 0.5);
-      border-radius: 6px;
-      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-      transition: transform var(--transition-fast), background-color var(--transition-fast);
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-radius: var(--radius-sm);
+      background-color: var(--bg-component);
+      transition: all var(--transition-fast);
     }
     
-    .cod-step:hover {
-      background-color: rgba(44, 59, 79, 0.8);
+    .step:hover {
+      background-color: var(--bg-hover);
       transform: translateY(-1px);
     }
     
@@ -497,26 +488,29 @@
       justify-content: center;
       min-width: 24px;
       height: 24px;
-      background-color: rgba(61, 79, 105, 0.8);
+      background-color: var(--bg-hover);
       border-radius: 12px;
       margin-right: 10px;
-      color: var(--accent-primary);
+      color: var(--text-primary);
       font-size: 0.75rem;
       font-weight: bold;
     }
     
     .step-content {
       flex: 1;
-      padding-right: 8px;
-      font-family: 'Roboto Mono', monospace;
+      line-height: 1.5;
       color: var(--text-primary);
-      line-height: 1.6;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.9rem;
     }
     
     /* Reflection Step Styling */
     .reflection-step {
       background-color: rgba(61, 70, 97, 0.6) !important;
       border-left: 3px solid #8a5cf7 !important;
+      padding: 12px 15px !important;
+      margin: 10px 0 !important;
+      border-radius: var(--radius-sm);
     }
     
     .reflection-step .step-number {
@@ -527,6 +521,7 @@
     .reflection-step .step-content {
       color: #d4c5ff !important;
       font-style: italic;
+      line-height: 1.4;
     }
     
     /* Final Answer Styling */
@@ -1635,6 +1630,9 @@
     .reflection-step {
       background-color: rgba(61, 70, 97, 0.6) !important;
       border-left: 3px solid #8a5cf7 !important;
+      padding: 12px 15px !important;
+      margin: 10px 0 !important;
+      border-radius: var(--radius-sm);
     }
     
     .reflection-step .step-number {
@@ -1645,6 +1643,7 @@
     .reflection-step .step-content {
       color: #d4c5ff !important;
       font-style: italic;
+      line-height: 1.4;
     }
     
     .range-container {
@@ -2226,6 +2225,154 @@
       height: 18px;
       cursor: pointer;
     }
+
+    /* Add styles for reflection steps */
+    .reflection-step {
+      background-color: rgba(61, 70, 97, 0.6) !important;
+      border-left: 3px solid #8a5cf7 !important;
+      padding: 12px 15px !important;
+      margin: 10px 0 !important;
+      border-radius: var(--radius-sm);
+    }
+
+    .reflection-step .step-number {
+      background-color: rgba(93, 77, 138, 0.8) !important;
+      color: #d4c5ff !important;
+    }
+
+    .reflection-step .step-content {
+      color: #d4c5ff !important;
+      font-style: italic;
+      line-height: 1.4;
+    }
+
+    /* Update thinking steps container */
+    .thinking-steps {
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 15px;
+      margin-bottom: 15px;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      overflow-x: auto;
+    }
+
+    .thinking-label {
+      font-size: 0.7rem;
+      font-family: 'Inter', sans-serif;
+      color: var(--text-tertiary);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-light);
+      padding-bottom: 6px;
+    }
+
+    /* Update step styling */
+    .step {
+      display: flex;
+      align-items: flex-start;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      border-radius: var(--radius-sm);
+      background-color: var(--bg-component);
+      transition: all var(--transition-fast);
+    }
+
+    .step:hover {
+      background-color: var(--bg-hover);
+      transform: translateY(-1px);
+    }
+
+    .step-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      background-color: var(--bg-hover);
+      border-radius: 12px;
+      margin-right: 10px;
+      color: var(--text-primary);
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+
+    .step-content {
+      flex: 1;
+      line-height: 1.5;
+      color: var(--text-primary);
+      font-family: 'Roboto Mono', monospace;
+      font-size: 0.9rem;
+    }
+
+    /* Self-reflection toggle styling */
+    .self-reflection-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      background-color: var(--bg-tertiary);
+      border-radius: var(--radius-sm);
+      margin-bottom: 15px;
+    }
+
+    .self-reflection-toggle label {
+      font-weight: 500;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+
+    /* Update info panel styling */
+    #selfReflectionInfo {
+      background-color: var(--bg-tertiary);
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-sm);
+      padding: 15px;
+      margin-top: 10px;
+    }
+
+    #selfReflectionInfo .option-description {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      margin-bottom: 15px;
+    }
+
+    #selfReflectionInfo .problem-analyzer {
+      background-color: var(--bg-component);
+      border-radius: var(--radius-sm);
+      padding: 15px;
+    }
+
+    #selfReflectionInfo .analyzer-title {
+      color: var(--accent-primary);
+      font-weight: 500;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #selfReflectionInfo .analyzer-help {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+
+    #selfReflectionInfo .analyzer-help ul {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    #selfReflectionInfo .analyzer-help li {
+      margin-bottom: 6px;
+      color: var(--text-secondary);
+    }
   </style>
 </head>
 <body>
@@ -2439,7 +2586,7 @@
 
       <!-- Replace Self-Consistency Section with Self-Reflection -->
       <div class="advanced-options-header">
-        Self-Reflection for Chain of Draft
+        Self-Reflection
         <label class="toggle-switch">
           <input type="checkbox" id="selfReflectionToggle" checked>
           <span class="toggle-slider"></span>
@@ -2448,7 +2595,7 @@
 
       <div id="selfReflectionInfo" class="enhanced-reasoning">
         <div class="option-description">
-          Adds a reflection step after reasoning to help the model verify its own work and catch mistakes.
+          Adds a reflection step before the final answer to help catch errors and verify reasoning.
         </div>
         
         <div class="problem-analyzer">
@@ -2487,12 +2634,12 @@
       </div>
       <p style="font-size: 0.8rem; color: #aaa; margin-top: 0;">Controls diversity via nucleus sampling.</p>
 
-      <label for="maxTokens">Max Tokens</label>
+      <label for="maxTokens">Max Tokens (1-8192)</label>
       <div class="range-container">
-        <input type="range" id="maxTokens" min="256" max="128000" step="128" value="4096">
+        <input type="range" id="maxTokens" min="256" max="8192" step="128" value="4096">
         <span id="maxTokensValue" class="range-value">4096</span>
       </div>
-      <p style="font-size: 0.8rem; color: #aaa; margin-top: 0;">Maximum length of the response (up to 128k tokens).</p>
+      <p style="font-size: 0.8rem; color: #aaa; margin-top: 0;">Maximum length of the response (DeepSeek API limit is 8192 tokens).</p>
     </div>
     
     <div style="text-align: right; margin-top: 20px;">
@@ -2562,143 +2709,173 @@
     /***********************
      * Global Configuration
      ***********************/
-    let MODEL_NAME = "";
-    let MODEL_NAME_DISPLAY = "";
-    let enableWebSearch = false; // Add web search global variable
-    
-    // Add both API endpoints - primary and fallback
-    const EDGE_API_URL = "/api/proxy"; // Edge Function (primary)
-    const FALLBACK_API_URL = "/api-fallback/proxy"; // Regular Function (fallback)
-    // Keep the original for backward compatibility
-    const API_PROXY_URL = EDGE_API_URL; // For compatibility
-    
-    // Reasoning Method
-    let REASONING_METHOD = "cod"; // Options: "standard", "cot", "cod"
-    
-    // COD Word Limit
-    let COD_WORD_LIMIT = 5;
-    
-    // NEW: Enhanced reasoning controls
+    let MODEL_NAME = "llama-3.3-70b";
+    let MODEL_NAME_DISPLAY = "Llama 3.3 (70B)";
+    let REASONING_METHOD = "cod";
+    let COD_WORD_LIMIT = 20;
     let ENHANCED_REASONING_ENABLED = true;
-    let REASONING_ENHANCEMENT = "adaptive"; // Options: "adaptive", "standard"
-    
-    // NEW: Problem complexity detection
-    let PROBLEM_COMPLEXITY = {
-      hasMath: false,
-      hasLogic: false,
-      multiStep: false,
-      complexity: "normal" // Options: "simple", "normal", "complex"
-    };
-    
-    // Prompts for different reasoning methods
-    let PROMPTS = {
-      standard: "",
-      
-      cot: `Think step by step to solve this problem. Explain your reasoning at each step, then provide your final answer.`,
-      
-      cod: `Think step by step, but produce only minimal notes for each step (${COD_WORD_LIMIT} words maximum per step). Use mathematical notation where possible. Keep only essential information needed to solve the problem. Focus on key calculations and intermediate results without narrative explanation.
-  
-Separate your steps with periods. Write your final answer after the #### separator.
-
-Examples:
-Q: Jason had 20 lollipops. He gave Denny some lollipops. Now Jason has 12 lollipops. How many lollipops did Jason give to Denny?
-A: 20 initial. 12 remaining. 20 - 12 = 8. #### 8 lollipops
-
-Q: Roger has $125. He spends $55 on a video game and then receives $25 for his birthday. How much money does Roger have now?
-A: Start: $125. Spent: $55. 125 - 55 = $70. Received: $25. 70 + 25 = $95. #### $95
-
-Q: A square has a perimeter of 20 cm. What is its area?
-A: Perimeter = 20 cm. Side length = 20/4 = 5 cm. Area = 5² = 25 cm². #### 25 square centimeters
-
-Q: If a fabric store received 45 yards of cotton material and used 2/9 of it for a bulk order, how many yards of cotton material does the fabric store have left?
-A: Total: 45 yards. Used: 2/9 × 45 = 10 yards. Remaining: 45 - 10 = 35 yards. #### 35 yards
-
-Q: The temperature on Monday was -3°C. On Tuesday, it was 14°C. What was the change in temperature from Monday to Tuesday?
-A: Monday: -3°C. Tuesday: 14°C. Change: 14 - (-3) = 17°C. #### 17°C`
-    };
-    
-    // NEW: Enhanced prompts for complex problems with different word limits
-    let ENHANCED_PROMPTS = {
-      cot: `Think step by step to solve this problem. This appears to be a complex problem that requires careful reasoning. Break down your thinking into clear steps, making sure to consider all relevant information and constraints. 
-
-For complex problems, use as many steps as needed to work through the solution thoroughly. It's better to use more steps with clear reasoning than to skip steps.
-
-Check your calculations and logic at each step. After you've completed your reasoning process, provide your final answer.`,
-      
-      cod5: `Think step by step to solve this complex problem. For each step, use at most 5 words to capture the essential reasoning, but use AS MANY STEPS as needed to thoroughly work through the problem. Use mathematical notation where efficient. Show ALL intermediate calculations and logical inferences.
-
-IMPORTANT: Instead of trying to fit complex reasoning into fewer steps, break your reasoning into more numerous simple steps. For example, instead of one step with "Calculate area using length×width=50×30=1500", use multiple steps:
-1. Length = 50.
-2. Width = 30.
-3. Area = length × width.
-4. Area = 50 × 30.
-5. Area = 1500.
-
-Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
-
-Separate your steps with periods. Write your final answer after the #### separator.
-
-Example of solving a complex problem with sufficient steps:
-Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: speed 60 mph. First segment: time 2h. First segment: distance = 60 × 2. First segment: distance = 120 miles. Second segment: speed 75 mph. Second segment: time 1h. Second segment: distance = 75 × 1. Second segment: distance = 75 miles. Third segment: speed 50 mph. Third segment: time 0.5h. Third segment: distance = 50 × 0.5. Third segment: distance = 25 miles. Total distance: 120 + 75 + 25. Reflection: Verified all calculations and units match. Each segment's distance correctly computed. #### 220 miles`,
-
-      cod10: `Think step by step to solve this complex problem. For each step, use up to 10 words to capture the essential reasoning. Use AS MANY STEPS as needed to fully solve the problem. Include ALL intermediate calculations and logical inferences.
-
-IMPORTANT: For complex problems, it's better to use more steps with clear reasoning than to try cramming too much into each step. Break complex calculations into multiple steps.
-
-When thinking through difficult parts of a problem:
-1. Identify what information you need
-2. Think about how to derive that information
-3. Perform calculations systematically
-4. Check your work at key points
-
-Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
-
-Separate your steps with periods. Write your final answer after the #### separator.
-
-Example of solving a complex problem:
-Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: speed 60 mph for 2 hours. First segment distance calculation: 60 mph × 2h. First segment distance = 120 miles. Second segment: speed 75 mph for 1 hour. Second segment distance calculation: 75 mph × 1h. Second segment distance = 75 miles. Third segment: speed 50 mph for 0.5 hours. Third segment distance calculation: 50 mph × 0.5h. Third segment distance = 25 miles. Need to sum all segment distances. Total distance calculation: 120 + 75 + 25. Reflection: Verified all time periods sum correctly and speed calculations are accurate. #### 220 miles`,
-      
-      cod15: `Think step by step to solve this complex problem. For each step, use up to 15 words to capture the essential reasoning, providing more detail for critical steps. Use mathematical notation where helpful but include explanations of your approach at key points.
-
-Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
-
-Separate your steps with periods. Write your final answer after the #### separator.
-
-Example of solving a complex problem:
-Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: The car travels at 60 mph for 2 hours, so distance = 60 × 2 = 120 miles. Second segment: The car increases to 75 mph for 1 hour, so distance = 75 × 1 = 75 miles. Third segment: The car decreases to 50 mph for 0.5 hours, so distance = 50 × 0.5 = 25 miles. Reflection: Checked all calculations and time periods sum to 3.5 hours total. #### 220 miles`,
-      
-      cod17: `Think step by step to solve this complex problem. For each step, use up to 17 words to provide clear reasoning, especially for difficult parts. Balance precision and concision, using math notation to save words.
-
-Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
-
-Separate your steps with periods. Write your final answer after the #### separator.
-
-Example of solving a complex problem:
-Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: The car travels at 60 mph for 2 hours, giving distance = 60 × 2 = 120 miles. Second segment: Speed increases to 75 mph for 1 hour, so this segment's distance = 75 miles. Third segment: Speed is 50 mph for 0.5 hours, contributing 50 × 0.5 = 25 miles. Reflection: Verified all calculations and confirmed total time equals 3.5 hours. #### 220 miles`,
-      
-      cod20: `Think step by step to solve this complex problem. For each step, use up to 20 words to provide clear reasoning, explaining your approach more thoroughly for the difficult parts of the problem.
-
-Before providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.
-
-Separate your steps with periods. Write your final answer after the #### separator.
-
-Example of solving a complex problem:
-Q: A car travels at 60 mph. After 2 hours, it increases speed to 75 mph for 1 hour. It then decreases to 50 mph for the final 30 minutes. What is the total distance traveled?
-A: First segment: The car travels at 60 mph for 2 hours, so the distance covered in this segment is 60 × 2 = 120 miles. Second segment: The car then increases speed to 75 mph and maintains this for 1 hour, covering 75 × 1 = 75 miles. Third segment: Finally, the car decreases speed to 50 mph for 30 minutes (0.5 hours), covering 50 × 0.5 = 25 miles. Reflection: Verified all calculations are correct and time periods sum to 3.5 hours as expected. #### 220 miles`
-    };
-    
-    // Default generation parameters
+    let REASONING_ENHANCEMENT = "adaptive";
     let TEMPERATURE = 0.5;
-    let TOP_P = 0.90;
+    let TOP_P = 0.9;
     let MAX_TOKENS = 4096;
+    let threads = [];
+    let currentThreadId = null;
+    let threadCounter = 1;
+    let SELF_REFLECTION_ENABLED = true;
 
-    // Initialize global self-consistency variables
-    let SELF_CONSISTENCY_ENABLED = false;
-    let SELF_CONSISTENCY_PATHS = 3;
+    // Self-reflection configuration
+    const REFLECTION_PROMPT = "Before providing your final answer, add a reflection step starting with 'Reflection:' to verify your work and catch any potential errors.";
+
+    // Remove old self-consistency variables
+    // let SELF_CONSISTENCY_ENABLED = false;
+    // let SELF_CONSISTENCY_PATHS = 3;
+
+    // Add self-reflection to base prompts
+    function addReflectionToPrompt(prompt) {
+      if (!prompt.includes(REFLECTION_PROMPT)) {
+        if (prompt.includes('Write your final answer after the #### separator')) {
+          return prompt.replace(
+            'Write your final answer after the #### separator',
+            `${REFLECTION_PROMPT}\n\nWrite your final answer after the #### separator`
+          );
+        } else {
+          return prompt + `\n\n${REFLECTION_PROMPT}`;
+        }
+      }
+      return prompt;
+    }
+
+    function removeReflectionFromPrompt(prompt) {
+      return prompt
+        .replace(`${REFLECTION_PROMPT}\n\n`, '')
+        .replace(`\n\n${REFLECTION_PROMPT}`, '');
+    }
+
+    // Update prompts based on reflection state
+    function updatePromptsWithReflection() {
+      if (SELF_REFLECTION_ENABLED) {
+        // Add reflection to standard prompts
+        PROMPTS.cod = addReflectionToPrompt(PROMPTS.cod);
+        PROMPTS.cot = addReflectionToPrompt(PROMPTS.cot);
+        
+        // Add reflection to enhanced prompts
+        Object.keys(ENHANCED_PROMPTS).forEach(key => {
+          ENHANCED_PROMPTS[key] = addReflectionToPrompt(ENHANCED_PROMPTS[key]);
+        });
+      } else {
+        // Remove reflection from standard prompts
+        PROMPTS.cod = removeReflectionFromPrompt(PROMPTS.cod);
+        PROMPTS.cot = removeReflectionFromPrompt(PROMPTS.cot);
+        
+        // Remove reflection from enhanced prompts
+        Object.keys(ENHANCED_PROMPTS).forEach(key => {
+          ENHANCED_PROMPTS[key] = removeReflectionFromPrompt(ENHANCED_PROMPTS[key]);
+        });
+      }
+      
+      // Save updated prompts
+      localStorage.setItem('customPrompts', JSON.stringify(PROMPTS));
+      localStorage.setItem('enhancedPrompts', JSON.stringify(ENHANCED_PROMPTS));
+    }
+
+    // Initialize self-reflection UI and settings
+    function initSelfReflection() {
+      const selfReflectionToggle = document.getElementById('selfReflectionToggle');
+      const infoPanel = document.getElementById('selfReflectionInfo');
+      
+      if (selfReflectionToggle) {
+        // Load saved state or use default
+        const savedState = localStorage.getItem('selfReflectionEnabled');
+        SELF_REFLECTION_ENABLED = savedState !== null ? savedState === 'true' : true;
+        
+        // Update UI to match state
+        selfReflectionToggle.checked = SELF_REFLECTION_ENABLED;
+        if (infoPanel) {
+          infoPanel.style.display = SELF_REFLECTION_ENABLED ? 'block' : 'none';
+        }
+        
+        // Add event listener
+        selfReflectionToggle.addEventListener('change', () => {
+          SELF_REFLECTION_ENABLED = selfReflectionToggle.checked;
+          if (infoPanel) {
+            infoPanel.style.display = SELF_REFLECTION_ENABLED ? 'block' : 'none';
+          }
+          // Update prompts and save state
+          updatePromptsWithReflection();
+          localStorage.setItem('selfReflectionEnabled', SELF_REFLECTION_ENABLED.toString());
+          console.log('Self-reflection ' + (SELF_REFLECTION_ENABLED ? 'enabled' : 'disabled'));
+        });
+      }
+    }
+
+    // Update loadPersistedSettings to handle self-reflection
+    function loadPersistedSettings() {
+      try {
+        MODEL_NAME = localStorage.getItem("modelName") || "";
+        MODEL_NAME_DISPLAY = getModelDisplayName(MODEL_NAME);
+        
+        REASONING_METHOD = localStorage.getItem("reasoningMethod") || "cod";
+        
+        const codWordLimit = localStorage.getItem("codWordLimit");
+        if (codWordLimit) COD_WORD_LIMIT = parseInt(codWordLimit);
+        
+        // Load enhanced reasoning settings
+        const enhancedEnabled = localStorage.getItem("enhancedReasoningEnabled");
+        if (enhancedEnabled !== null) {
+          ENHANCED_REASONING_ENABLED = enhancedEnabled === "true";
+        }
+        
+        const enhancementType = localStorage.getItem("reasoningEnhancement");
+        if (enhancementType) {
+          REASONING_ENHANCEMENT = enhancementType;
+        }
+        
+        // Load custom prompts if available
+        const storedPrompts = localStorage.getItem("customPrompts");
+        if (storedPrompts) {
+          const parsedPrompts = JSON.parse(storedPrompts);
+          PROMPTS = { ...PROMPTS, ...parsedPrompts };
+        }
+        
+        // Load enhanced prompts if available
+        const storedEnhancedPrompts = localStorage.getItem("enhancedPrompts");
+        if (storedEnhancedPrompts) {
+          const parsedEnhancedPrompts = JSON.parse(storedEnhancedPrompts);
+          ENHANCED_PROMPTS = { ...ENHANCED_PROMPTS, ...parsedEnhancedPrompts };
+        }
+        
+        // Load self-reflection state
+        const selfReflectionEnabled = localStorage.getItem('selfReflectionEnabled');
+        if (selfReflectionEnabled !== null) {
+          SELF_REFLECTION_ENABLED = selfReflectionEnabled === 'true';
+        }
+        
+        // Update prompts with reflection state
+        updatePromptsWithReflection();
+        
+        const temp = localStorage.getItem("temperature");
+        if (temp) TEMPERATURE = parseFloat(temp);
+        
+        const topP = localStorage.getItem("topP");
+        if (topP) TOP_P = parseFloat(topP);
+        
+        const maxTokens = localStorage.getItem("maxTokens");
+        if (maxTokens) {
+          // Ensure loaded value respects DeepSeek's limits
+          MAX_TOKENS = ensureValidTokens(parseInt(maxTokens));
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
+      }
+    }
+
+    // Remove old self-consistency code
+    function removeOldSelfConsistencyCode() {
+      window.SELF_CONSISTENCY_ENABLED = undefined;
+      window.SELF_CONSISTENCY_PATHS = undefined;
+      window.initSelfConsistency = undefined;
+      window.saveSelfConsistencySettings = undefined;
+    }
     
     /***********************
      * Helper Functions
@@ -4500,10 +4677,29 @@ Separate your steps with periods. Write your final answer after the #### separat
         const valueDisplay = document.getElementById(`${slider.id}Value`);
         if (valueDisplay) {
           slider.addEventListener('input', () => {
+            // For max tokens slider, ensure value respects DeepSeek's limits
+            if (slider.id === 'maxTokens') {
+              slider.value = ensureValidTokens(parseInt(slider.value));
+            }
             valueDisplay.textContent = slider.value;
           });
         }
       });
+      
+      // Add specific handler for max tokens slider
+      const maxTokensSlider = document.getElementById('maxTokens');
+      if (maxTokensSlider) {
+        maxTokensSlider.addEventListener('change', () => {
+          // Update global MAX_TOKENS when slider changes
+          MAX_TOKENS = ensureValidTokens(parseInt(maxTokensSlider.value));
+          console.log('Max tokens updated:', MAX_TOKENS);
+          
+          // Show notification if value was adjusted
+          if (parseInt(maxTokensSlider.value) > MAX_DEEPSEEK_TOKENS) {
+            showNotification('Max tokens adjusted to respect DeepSeek API limit (8192)');
+          }
+        });
+      }
     }
     
     function openSettingsModal() {
@@ -4884,7 +5080,10 @@ Separate your steps with periods. Write your final answer after the #### separat
         if (topP) TOP_P = parseFloat(topP);
         
         const maxTokens = localStorage.getItem("maxTokens");
-        if (maxTokens) MAX_TOKENS = parseInt(maxTokens);
+        if (maxTokens) {
+          // Ensure loaded value respects DeepSeek's limits
+          MAX_TOKENS = ensureValidTokens(parseInt(maxTokens));
+        }
         
         // Load self-consistency settings
         const selfConsistencyEnabled = localStorage.getItem("selfConsistencyEnabled");
@@ -4905,6 +5104,34 @@ Separate your steps with periods. Write your final answer after the #### separat
       console.log("Initializing app...");
       
       try {
+        // Initialize max tokens slider with DeepSeek limits
+        const maxTokensSlider = document.getElementById('maxTokens');
+        if (maxTokensSlider) {
+          maxTokensSlider.setAttribute('max', MAX_DEEPSEEK_TOKENS.toString());
+          maxTokensSlider.value = Math.min(maxTokensSlider.value, MAX_DEEPSEEK_TOKENS);
+          
+          // Update the display value
+          const maxTokensValue = document.getElementById('maxTokensValue');
+          if (maxTokensValue) {
+            maxTokensValue.textContent = maxTokensSlider.value;
+          }
+          
+          // Update the label
+          const maxTokensLabel = document.querySelector('label[for="maxTokens"]');
+          if (maxTokensLabel) {
+            maxTokensLabel.textContent = 'Max Tokens (1-8192)';
+          }
+          
+          // Update the description
+          const maxTokensDescription = maxTokensLabel.nextElementSibling.nextElementSibling;
+          if (maxTokensDescription && maxTokensDescription.tagName === 'P') {
+            maxTokensDescription.textContent = 'Maximum length of the response (DeepSeek API limit is 8192 tokens).';
+          }
+        }
+        
+        // Ensure global MAX_TOKENS respects DeepSeek's limits
+        MAX_TOKENS = ensureValidTokens(MAX_TOKENS);
+        
         removeGlobalSelfConsistencyVars();
         loadPersistedSettings();
         console.log("Settings loaded");
@@ -4926,23 +5153,23 @@ Separate your steps with periods. Write your final answer after the #### separat
         initFeedbackForm();
         console.log("Feedback form initialized");
         
-       // Add clear thread button event listener (using existing button in HTML)
-       const clearThreadBtn = document.getElementById("clearThreadBtn");
-      if (clearThreadBtn) {
-      clearThreadBtn.addEventListener("click", () => {
-      if (confirm("Clear all messages in this thread?")) {
-        const thread = threads.find(t => t.id === currentThreadId);
-        if (thread) {
-        thread.messages = [];
-        renderCurrentThreadMessages();
-        showNotification("Thread cleared");
-      }
-    }
-  });
-  console.log("Clear thread button initialized");
-} else {
-  console.warn("Clear thread button not found in DOM");
-}
+        // Add clear thread button event listener (using existing button in HTML)
+        const clearThreadBtn = document.getElementById("clearThreadBtn");
+        if (clearThreadBtn) {
+          clearThreadBtn.addEventListener("click", () => {
+            if (confirm("Clear all messages in this thread?")) {
+              const thread = threads.find(t => t.id === currentThreadId);
+              if (thread) {
+                thread.messages = [];
+                renderCurrentThreadMessages();
+                showNotification("Thread cleared");
+              }
+            }
+          });
+          console.log("Clear thread button initialized");
+        } else {
+          console.warn("Clear thread button not found in DOM");
+        }
         
         // Add clear thread button to the sidebar
         const sidebar = document.querySelector(".sidebar");
@@ -4962,12 +5189,6 @@ Separate your steps with periods. Write your final answer after the #### separat
             }
           }, 1000);
         }
-        
-        // No longer need this function as we've improved the tab navigation
-        // setTimeout(() => {
-        //   fixTabContentDisplay();
-        //   console.log("Fixed tab content display");
-        // }, 200);
       } catch (err) {
         console.error("Initialization error:", err);
       }
@@ -5033,6 +5254,10 @@ Separate your steps with periods. Write your final answer after the #### separat
         }
       }
 
+      // Initialize self-reflection
+      initSelfReflection();
+      
+      // Initialize the rest of the app
       init();
     });
 
@@ -5287,11 +5512,219 @@ Separate your steps with periods. Write your final answer after the #### separat
       // Show notification
       showNotification(enableWebSearch ? 'Web search enabled' : 'Web search disabled');
     }
+
+    // Helper function to ensure token values are within valid range
+    function ensureValidTokens(tokens) {
+      return Math.min(Math.max(1, tokens), MAX_DEEPSEEK_TOKENS);
+    }
+
+    // Update loadPersistedSettings to enforce token limits
+    function loadPersistedSettings() {
+      try {
+        MODEL_NAME = localStorage.getItem("modelName") || "";
+        MODEL_NAME_DISPLAY = getModelDisplayName(MODEL_NAME);
+        
+        REASONING_METHOD = localStorage.getItem("reasoningMethod") || "cod";
+        
+        const codWordLimit = localStorage.getItem("codWordLimit");
+        if (codWordLimit) COD_WORD_LIMIT = parseInt(codWordLimit);
+        
+        // Load enhanced reasoning settings
+        const enhancedEnabled = localStorage.getItem("enhancedReasoningEnabled");
+        if (enhancedEnabled !== null) {
+          ENHANCED_REASONING_ENABLED = enhancedEnabled === "true";
+        }
+        
+        const enhancementType = localStorage.getItem("reasoningEnhancement");
+        if (enhancementType) {
+          REASONING_ENHANCEMENT = enhancementType;
+        }
+        
+        // Load custom prompts if available
+        const storedPrompts = localStorage.getItem("customPrompts");
+        if (storedPrompts) {
+          const parsedPrompts = JSON.parse(storedPrompts);
+          PROMPTS = { ...PROMPTS, ...parsedPrompts };
+        }
+        
+        // Load enhanced prompts if available
+        const storedEnhancedPrompts = localStorage.getItem("enhancedPrompts");
+        if (storedEnhancedPrompts) {
+          const parsedEnhancedPrompts = JSON.parse(storedEnhancedPrompts);
+          ENHANCED_PROMPTS = { ...ENHANCED_PROMPTS, ...parsedEnhancedPrompts };
+        }
+        
+        const temp = localStorage.getItem("temperature");
+        if (temp) TEMPERATURE = parseFloat(temp);
+        
+        const topP = localStorage.getItem("topP");
+        if (topP) TOP_P = parseFloat(topP);
+        
+        const maxTokens = localStorage.getItem("maxTokens");
+        if (maxTokens) {
+          // Ensure loaded value respects DeepSeek's limits
+          MAX_TOKENS = ensureValidTokens(parseInt(maxTokens));
+        }
+        
+        // Load self-consistency settings
+        const selfConsistencyEnabled = localStorage.getItem("selfConsistencyEnabled");
+        if (selfConsistencyEnabled !== null) {
+          SELF_CONSISTENCY_ENABLED = selfConsistencyEnabled === "true";
+        }
+        
+        const selfConsistencyPaths = localStorage.getItem("selfConsistencyPaths");
+        if (selfConsistencyPaths) {
+          SELF_CONSISTENCY_PATHS = parseInt(selfConsistencyPaths);
+        }
+      } catch (err) {
+        console.error("Error loading settings:", err);
+      }
+    }
+
+    // Update saveSettings to enforce token limits
+    function saveSettings() {
+      try {
+        // ... existing saveSettings code ...
+        
+        // Save generation parameters safely
+        try {
+          const tempSlider = document.getElementById("temp");
+          if (tempSlider) {
+            TEMPERATURE = parseFloat(tempSlider.value);
+            if (TEMPERATURE === 0) TEMPERATURE = 0.01; // Ensure minimum value
+          }
+          
+          const topPSlider = document.getElementById("topP");
+          if (topPSlider) {
+            TOP_P = parseFloat(topPSlider.value);
+          }
+          
+          const maxTokensSlider = document.getElementById("maxTokens");
+          if (maxTokensSlider) {
+            // Ensure value respects DeepSeek's limits
+            MAX_TOKENS = ensureValidTokens(parseInt(maxTokensSlider.value));
+            // Update slider value to match enforced limit
+            maxTokensSlider.value = MAX_TOKENS;
+            const maxTokensValue = document.getElementById("maxTokensValue");
+            if (maxTokensValue) {
+              maxTokensValue.textContent = MAX_TOKENS;
+            }
+          }
+          
+          console.log("Parameters saved:", {TEMPERATURE, TOP_P, MAX_TOKENS});
+        } catch (paramsErr) {
+          console.error("Error getting parameters:", paramsErr);
+        }
+        
+        // ... rest of saveSettings code ...
+      } catch (err) {
+        console.error("Error in saveSettings:", err);
+        showNotification("Error saving settings. Check console for details.");
+      }
+    }
+
+    // Update buildMessagesForChat to handle token limits
+    function buildMessagesForChat(wordCountRequest = null) {
+      const thread = threads.find(t => t.id === currentThreadId);
+      if (!thread) return [];
+      
+      const messages = [];
+      
+      // ... existing buildMessagesForChat code ...
+      
+      // Detect if the messages are too long
+      const totalWords = messagesForApi.reduce((total, msg) => total + countWords(msg.content), 0);
+      const estimatedTokens = totalWords * 1.5; // Rough estimate of tokens from words
+      
+      // If the prompt is large, adjust max_tokens to avoid timeouts
+      let adjustedMaxTokens = MAX_TOKENS;
+      if (estimatedTokens > 2000) {
+        console.log(`Large prompt detected (est. ${Math.round(estimatedTokens)} tokens). Reducing max_tokens to avoid timeouts.`);
+        adjustedMaxTokens = Math.min(2048, MAX_TOKENS);
+      }
+      
+      // Ensure we never exceed DeepSeek's limits
+      adjustedMaxTokens = ensureValidTokens(adjustedMaxTokens);
+      
+      // Create payload with adjusted max_tokens
+      const payload = {
+        model: MODEL_NAME,
+        messages: messagesForApi,
+        temperature: TEMPERATURE,
+        top_p: TOP_P,
+        max_tokens: adjustedMaxTokens,
+        stream: false
+      };
+      
+      return payload;
+    }
+
+    // Update sendMessage to handle token-related errors
+    async function sendMessage(message) {
+      try {
+        // ... existing sendMessage code ...
+        
+        // Create payload for Netlify function with adjusted max_tokens
+        const payload = buildMessagesForChat(wordCountRequest);
+        
+        // Add timestamp to URL to prevent caching
+        const timestamp = new Date().getTime();
+        const cacheBuster = `?t=${timestamp}`;
+        
+        // Set a client-side timeout that's a bit longer than the edge function timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+        
+        console.log("Sending request to Edge Function endpoint...");
+        
+        try {
+          // First try: Send request to the Edge Function endpoint
+          const response = await fetch(`${EDGE_API_URL}${cacheBuster}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          
+          // Clear the timeout
+          clearTimeout(timeoutId);
+          
+          // If successful, process the response
+          if (response.ok) {
+            // ... existing success handling code ...
+          } else {
+            // Handle specific error cases
+            if (response.status === 400) {
+              const errorData = await response.json();
+              if (errorData.error && errorData.error.includes('max_tokens')) {
+                throw new Error('Invalid max_tokens value. Please reduce the max tokens in settings.');
+              }
+            }
+            throw new Error(`Edge Function returned status: ${response.status}`);
+          }
+        } catch (error) {
+          // ... existing error handling code ...
+          
+          // Add specific guidance for token-related errors
+          if (error.message.includes('max_tokens')) {
+            errorMessage = 'DeepSeek API error: Invalid max_tokens value. The valid range is 1-8192. Please adjust your settings.';
+          } else if (error.message.includes('timeout') || error.message.includes('aborted')) {
+            errorMessage = 'Request timed out. Try reducing the max_tokens value in Settings or using shorter prompts.';
+          }
+          
+          // ... rest of error handling code ...
+        }
+      } catch (error) {
+        console.error("Error in sendMessage:", error);
+      }
+    }
   </script>
   <form hidden="" method="post" name="feedback" data-netlify="true">
     <input type="hidden" name="form-name" value="feedback">
-    <input type="hidden" name="model">
-    <input type="hidden" name="reasoning_method">
+    <input type="hidden" id="feedbackModel" name="model" value="qwen-2.5-coder">
+    <input type="hidden" id="feedbackReasoning" name="reasoning_method" value="COD-20">
     <select name="feedback_type"></select>
     <input type="radio" name="rating" value="1">
     <input type="radio" name="rating" value="2">
@@ -5303,5 +5736,177 @@ Separate your steps with periods. Write your final answer after the #### separat
 
 <script async="" id="netlify-rum-container" src="./LLM Playground (COT vs COD)_files/rum" data-netlify-rum-site-id="46b8ee21-754a-4a63-b741-fe88bac724f4" data-netlify-deploy-branch="main" data-netlify-deploy-context="production" data-netlify-cwv-token="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzaXRlX2lkIjoiNDZiOGVlMjEtNzU0YS00YTYzLWI3NDEtZmU4OGJhYzcyNGY0IiwiYWNjb3VudF9pZCI6IjY3YzU0MzUzYzc2MjdjOTUxZDZmNTU0MSIsImRlcGxveV9pZCI6IjY3Y2JjOGE0NzRlY2E1MDAwODQ5MWVhYiIsImlzc3VlciI6Im5mc2VydmVyIn0.eeKx8JPS1uEj-YKOwtWMAEBFgcCAjTWkB8RLzmCfMmI"></script>
 
+<script>
+// Initialize everything when the page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // Settings modal functionality
+    const settingsModal = document.getElementById('settingsModal');
+    const openSettingsBtn = document.getElementById('openSettings');
+    const closeSettingsBtn = document.getElementById('closeSettings');
+    const closeModalXBtn = document.getElementById('closeModalX');
+
+    if (openSettingsBtn) {
+        openSettingsBtn.onclick = function() {
+            if (settingsModal) settingsModal.style.display = 'block';
+        };
+    }
+
+    if (closeSettingsBtn) {
+        closeSettingsBtn.onclick = function() {
+            if (settingsModal) settingsModal.style.display = 'none';
+        };
+    }
+
+    if (closeModalXBtn) {
+        closeModalXBtn.onclick = function() {
+            if (settingsModal) settingsModal.style.display = 'none';
+        };
+    }
+
+    // Close modal when clicking outside
+    window.onclick = function(event) {
+        if (event.target === settingsModal) {
+            settingsModal.style.display = 'none';
+        }
+    };
+
+    // Thread management
+    const newThreadBtn = document.getElementById('newThreadBtn');
+    const deleteThreadBtn = document.getElementById('deleteThreadBtn');
+    const clearThreadBtn = document.getElementById('clearThreadBtn');
+
+    if (newThreadBtn) {
+        newThreadBtn.onclick = function() {
+            createNewThread();
+            showNotification('New thread created');
+        };
+    }
+
+    if (deleteThreadBtn) {
+        deleteThreadBtn.onclick = function() {
+            if (confirm('Are you sure you want to delete this thread?')) {
+                deleteCurrentThread();
+                showNotification('Thread deleted');
+            }
+        };
+    }
+
+    if (clearThreadBtn) {
+        clearThreadBtn.onclick = function() {
+            if (confirm('Clear all messages in this thread?')) {
+                const thread = threads.find(t => t.id === currentThreadId);
+                if (thread) {
+                    thread.messages = [];
+                    renderCurrentThreadMessages();
+                    showNotification('Thread cleared');
+                }
+            }
+        };
+    }
+
+    // Message input handling
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    if (userInput) {
+        userInput.onkeydown = function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const message = this.value.trim();
+                if (message) {
+                    sendMessage(message);
+                    this.value = '';
+                }
+            }
+        };
+
+        // Auto-resize textarea
+        userInput.oninput = function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        };
+    }
+
+    if (sendBtn) {
+        sendBtn.onclick = function() {
+            const message = userInput.value.trim();
+            if (message) {
+                sendMessage(message);
+                userInput.value = '';
+            }
+        };
+    }
+
+    // Self-reflection functionality
+    const selfReflectionToggle = document.getElementById('selfReflectionToggle');
+    const selfReflectionInfo = document.getElementById('selfReflectionInfo');
+
+    if (selfReflectionToggle) {
+        // Load saved state or use default
+        const savedState = localStorage.getItem('selfReflectionEnabled');
+        SELF_REFLECTION_ENABLED = savedState !== null ? savedState === 'true' : true;
+        selfReflectionToggle.checked = SELF_REFLECTION_ENABLED;
+
+        if (selfReflectionInfo) {
+            selfReflectionInfo.style.display = SELF_REFLECTION_ENABLED ? 'block' : 'none';
+        }
+
+        selfReflectionToggle.onchange = function() {
+            SELF_REFLECTION_ENABLED = this.checked;
+            if (selfReflectionInfo) {
+                selfReflectionInfo.style.display = this.checked ? 'block' : 'none';
+            }
+            localStorage.setItem('selfReflectionEnabled', this.checked);
+            showNotification('Self-reflection ' + (this.checked ? 'enabled' : 'disabled'));
+        };
+    }
+
+    // Tab navigation in settings
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    tabButtons.forEach(button => {
+        button.onclick = function() {
+            const tabId = this.getAttribute('data-tab');
+            
+            // Hide all tabs and remove active class
+            tabContents.forEach(content => {
+                content.style.display = 'none';
+                content.classList.remove('active');
+            });
+            
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            
+            // Show selected tab and add active class
+            const selectedTab = document.getElementById(tabId);
+            if (selectedTab) {
+                selectedTab.style.display = 'block';
+                selectedTab.classList.add('active');
+                this.classList.add('active');
+            }
+        };
+    });
+
+    // Initialize first thread
+    createNewThread();
+});
+
+// Helper function to show notifications
+function showNotification(message, duration = 3000) {
+    const notification = document.getElementById('statusNotification');
+    if (notification) {
+        notification.textContent = message;
+        notification.style.display = 'block';
+        notification.style.opacity = '1';
+        
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 300);
+        }, duration);
+    }
+}
+</script>
 </body>
 </html>

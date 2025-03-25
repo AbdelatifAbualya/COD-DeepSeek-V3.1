@@ -1,7 +1,4 @@
-// First, create the following directory structure:
 // netlify/edge-functions/api-proxy.js
-
-// Here's the code for your Edge Function:
 
 export default async (request, context) => {
   // Handle CORS for preflight requests
@@ -71,16 +68,19 @@ export default async (request, context) => {
       );
     }
 
-    // Log request information (Edge Functions supports console.log)
+    // Log request information
     console.log('Request received for model:', requestBody.model || 'unknown');
     
-    // Always use DeepSeek V3
+    // Always use DeepSeek Chat V3
     const modelName = "deepseek-chat";
     
-    // Limit max tokens to avoid timeouts
+    // Properly validate max_tokens (DeepSeek API accepts 1-8192)
     const originalMaxTokens = requestBody.max_tokens || 4096;
-    // Handle very long requests more gracefully for Edge Functions
-    requestBody.max_tokens = Math.min(originalMaxTokens, 4096);
+    const validatedMaxTokens = Math.min(Math.max(1, originalMaxTokens), 8192);
+    
+    if (originalMaxTokens !== validatedMaxTokens) {
+      console.log(`Adjusted max_tokens from ${originalMaxTokens} to ${validatedMaxTokens} to meet DeepSeek API requirements`);
+    }
     
     // Prepare request for DeepSeek API
     const apiEndpoint = 'https://api.deepseek.com/v1/chat/completions';
@@ -88,10 +88,10 @@ export default async (request, context) => {
     const cleanedParams = {
       model: modelName,
       messages: requestBody.messages,
-      max_tokens: requestBody.max_tokens,
+      max_tokens: validatedMaxTokens,
       temperature: requestBody.temperature,
       top_p: requestBody.top_p,
-      stream: false // Edge functions could support streaming but we'll keep it simple for now
+      stream: false // Edge functions could support streaming but we'll keep it simple
     };
 
     // Remove undefined or null values
@@ -114,7 +114,7 @@ export default async (request, context) => {
     // Call the DeepSeek API with a timeout
     // Use AbortController via Promise.race to implement timeout
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), 25000); // 25-second timeout
+      setTimeout(() => reject(new Error('Request timeout')), 28000); // 28-second timeout (slightly increased)
     });
     
     const fetchPromise = fetch(apiEndpoint, apiRequestOptions);
@@ -134,9 +134,13 @@ export default async (request, context) => {
         errorMessage = errorText || `Error ${response.status}`;
       }
       
-      // Handle 401 error specially
+      // Handle specific errors
       if (response.status === 401) {
         errorMessage = "Authentication failed. Please check your DeepSeek API key.";
+      } else if (response.status === 400 && errorMessage.includes('max_tokens')) {
+        errorMessage = "Invalid max_tokens value. The DeepSeek API accepts values between 1 and 8192.";
+      } else if (response.status === 429) {
+        errorMessage = "Rate limit exceeded. Please try again in a few moments.";
       }
       
       return new Response(

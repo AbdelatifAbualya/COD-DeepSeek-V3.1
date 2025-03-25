@@ -2709,8 +2709,24 @@
     /***********************
      * Global Configuration
      ***********************/
-    let MODEL_NAME = "llama-3.3-70b";
-    let MODEL_NAME_DISPLAY = "Llama 3.3 (70B)";
+    // Remove duplicate variable declarations and update global variables
+    const AVAILABLE_MODELS = {
+        "deepseek-chat": {
+            name: "DeepSeek Chat V3",
+            tags: ["Latest", "Versatile", "Chat"],
+            description: "DeepSeek's latest chat model with strong performance across a wide range of tasks."
+        },
+        "deepseek-coder": {
+            name: "DeepSeek Coder",
+            tags: ["Code", "Technical", "Specialized"],
+            description: "Specialized model for code generation and technical tasks."
+        }
+    };
+
+    // Global variables (remove duplicates)
+    const MAX_DEEPSEEK_TOKENS = 8192;
+    let MODEL_NAME = "deepseek-chat";
+    let MODEL_NAME_DISPLAY = "DeepSeek Chat V3";
     let REASONING_METHOD = "cod";
     let COD_WORD_LIMIT = 20;
     let ENHANCED_REASONING_ENABLED = true;
@@ -2722,6 +2738,7 @@
     let currentThreadId = null;
     let threadCounter = 1;
     let SELF_REFLECTION_ENABLED = true;
+    let enableWebSearch = false;
 
     // Self-reflection configuration
     const REFLECTION_PROMPT = "Before providing your final answer, add a reflection step starting with 'Reflection:' to verify your work and catch any potential errors.";
@@ -2780,30 +2797,30 @@
 
     // Initialize self-reflection UI and settings
     function initSelfReflection() {
-      const selfReflectionToggle = document.getElementById('selfReflectionToggle');
+      const toggle = document.getElementById('selfReflectionToggle');
       const infoPanel = document.getElementById('selfReflectionInfo');
       
-      if (selfReflectionToggle) {
+      if (toggle) {
         // Load saved state or use default
         const savedState = localStorage.getItem('selfReflectionEnabled');
         SELF_REFLECTION_ENABLED = savedState !== null ? savedState === 'true' : true;
         
         // Update UI to match state
-        selfReflectionToggle.checked = SELF_REFLECTION_ENABLED;
+        toggle.checked = SELF_REFLECTION_ENABLED;
         if (infoPanel) {
           infoPanel.style.display = SELF_REFLECTION_ENABLED ? 'block' : 'none';
         }
         
         // Add event listener
-        selfReflectionToggle.addEventListener('change', () => {
-          SELF_REFLECTION_ENABLED = selfReflectionToggle.checked;
+        toggle.addEventListener('change', () => {
+          SELF_REFLECTION_ENABLED = toggle.checked;
           if (infoPanel) {
             infoPanel.style.display = SELF_REFLECTION_ENABLED ? 'block' : 'none';
           }
           // Update prompts and save state
           updatePromptsWithReflection();
           localStorage.setItem('selfReflectionEnabled', SELF_REFLECTION_ENABLED.toString());
-          console.log('Self-reflection ' + (SELF_REFLECTION_ENABLED ? 'enabled' : 'disabled'));
+          showNotification('Self-reflection ' + (SELF_REFLECTION_ENABLED ? 'enabled' : 'disabled'));
         });
       }
     }
@@ -4391,126 +4408,82 @@
       const modelTags = document.getElementById('modelTags');
       const modelDescription = document.getElementById('modelDescription');
       
-      // Model information database
-      const modelInfo = {
-        "deepseek-chat": {
-          name: "DeepSeek Chat V3",
-          tags: ["Latest", "Versatile", "Chat"],
-          description: "DeepSeek's latest chat model with strong performance across a wide range of tasks."
-        },
-        "deepseek-reasoner": {
-          name: "DeepSeek R1 (Reasoner)",
-          tags: ["Latest", "Reasoning", "Advanced"],
-          description: "DeepSeek's specialized reasoning model (R1) with enhanced logical and mathematical capabilities."
-        }
-      };
+      if (!modelSelect) return;
       
       // Clear existing options
-      modelSelect.innerHTML = '<option value="" disabled selected>Choose a model...</option>';
+      modelSelect.innerHTML = '<option value="" disabled selected>Choose a DeepSeek model...</option>';
       
-      // Sort models by name
-      const sortedModels = Object.entries(modelInfo).sort((a, b) => 
-        a[1].name.localeCompare(b[1].name)
-      );
-      
-      // Add models from the modelInfo object
-      sortedModels.forEach(([id, info]) => {
-        const option = document.createElement('option');
-        option.value = id;
-        option.textContent = info.name;
-        modelSelect.appendChild(option);
+      // Add only DeepSeek models
+      Object.entries(AVAILABLE_MODELS).forEach(([id, info]) => {
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = info.name;
+          modelSelect.appendChild(option);
       });
       
-      // Initialize with current model if set
-      if (MODEL_NAME && modelInfo[MODEL_NAME]) {
-        modelSelect.value = MODEL_NAME;
-        updateModelInfo(MODEL_NAME);
+      // Set current model if valid
+      if (MODEL_NAME && AVAILABLE_MODELS[MODEL_NAME]) {
+          modelSelect.value = MODEL_NAME;
+          updateModelInfo(MODEL_NAME);
       } else {
-        // Set default to DeepSeek Chat if no model is selected
-        MODEL_NAME = "deepseek-chat";
-        MODEL_NAME_DISPLAY = "DeepSeek Chat V3";
-        modelSelect.value = MODEL_NAME;
-        updateModelInfo(MODEL_NAME);
+          // Default to DeepSeek Chat if no valid model is selected
+          MODEL_NAME = "deepseek-chat";
+          MODEL_NAME_DISPLAY = AVAILABLE_MODELS[MODEL_NAME].name;
+          modelSelect.value = MODEL_NAME;
+          updateModelInfo(MODEL_NAME);
       }
       
-      // Update model info card when selection changes
+      // Update model info when selection changes
       modelSelect.addEventListener('change', () => {
-        const selectedModel = modelSelect.value;
-        updateModelInfo(selectedModel);
-        
-        // Show visual feedback on change
-        modelSelect.style.borderColor = 'var(--accent-primary)';
-        setTimeout(() => {
-          modelSelect.style.borderColor = '';
-        }, 500);
+          const selectedModel = modelSelect.value;
+          updateModelInfo(selectedModel);
       });
+      
+      // Handle set model button
+      if (setModelBtn) {
+          setModelBtn.addEventListener('click', () => {
+              const modelName = modelSelect.value;
+              if (modelName && AVAILABLE_MODELS[modelName]) {
+                  MODEL_NAME = modelName;
+                  MODEL_NAME_DISPLAY = AVAILABLE_MODELS[modelName].name;
+                  updateCurrentModelDisplay();
+                  showNotification('Model set: ' + MODEL_NAME_DISPLAY);
+                  
+                  // Save to localStorage
+                  localStorage.setItem('modelName', MODEL_NAME);
+                  
+                  // Close settings modal
+                  closeSettingsModal();
+              } else {
+                  showNotification('Please select a valid model');
+              }
+          });
+      }
       
       function updateModelInfo(modelId) {
-        if (!modelInfoCard) return;
-        
-        if (modelInfo[modelId]) {
-          const info = modelInfo[modelId];
+          if (!modelInfoCard) return;
           
-          // Update header
-          if (selectedModelName) {
-            selectedModelName.textContent = info.name;
-          }
-          
-          // Update tags with animation
-          if (modelTags) {
-            modelTags.style.opacity = '0';
-            setTimeout(() => {
-              modelTags.innerHTML = info.tags
-                .map(tag => `<span class="model-tag">${tag}</span>`)
-                .join('');
-              modelTags.style.opacity = '1';
-            }, 150);
-          }
-          
-          // Update description with animation
-          if (modelDescription) {
-            modelDescription.style.opacity = '0';
-            setTimeout(() => {
-              modelDescription.textContent = info.description;
-              modelDescription.style.opacity = '1';
-            }, 150);
-          }
-          
-          // Show the card with animation
-          modelInfoCard.style.display = 'block';
-          modelInfoCard.style.opacity = '0';
-          modelInfoCard.style.transform = 'translateY(10px)';
-          
-          requestAnimationFrame(() => {
-            modelInfoCard.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-            modelInfoCard.style.opacity = '1';
-            modelInfoCard.style.transform = 'translateY(0)';
-          });
-        } else {
-          // Hide or reset the card if no valid model
-          modelInfoCard.style.display = 'none';
-        }
-      }
-      
-      // Set model button enhancement
-      if (setModelBtn) {
-        setModelBtn.addEventListener('click', () => {
-          const modelName = modelSelect.value;
-          if (modelName) {
-            MODEL_NAME = modelName;
-            MODEL_NAME_DISPLAY = modelInfo[modelName] ? modelInfo[modelName].name : getModelDisplayName(modelName);
-            updateCurrentModelDisplay();
-            showNotification('Model set: ' + MODEL_NAME_DISPLAY);
-            
-            // Add visual feedback
-            setModelBtn.classList.add('success');
-            setTimeout(() => {
-              setModelBtn.classList.remove('success');
-            }, 1000);
+          if (AVAILABLE_MODELS[modelId]) {
+              const info = AVAILABLE_MODELS[modelId];
+              
+              if (selectedModelName) {
+                  selectedModelName.textContent = info.name;
+              }
+              
+              if (modelTags) {
+                  modelTags.innerHTML = info.tags
+                      .map(tag => `<span class="model-tag">${tag}</span>`)
+                      .join('');
+              }
+              
+              if (modelDescription) {
+                  modelDescription.textContent = info.description;
+              }
+              
+              modelInfoCard.style.display = 'block';
           } else {
-            showNotification('Please select a valid model');
+              modelInfoCard.style.display = 'none';
           }
-        });
       }
     }
     
@@ -5200,125 +5173,141 @@ Separate your steps with periods. Write your final answer after the #### separat
       const textarea = document.getElementById('userInput');
       const sendBtn = document.getElementById('sendBtn');
       const webSearchBtn = document.getElementById('webSearchBtn');
+      const settingsModal = document.getElementById('settingsModal');
+      const openSettingsBtn = document.getElementById('openSettings');
+      const closeSettingsBtn = document.getElementById('closeSettings');
+      const closeModalXBtn = document.getElementById('closeModalX');
+      const saveSettingsBtn = document.getElementById('saveSettings');
 
+      // Settings modal functionality
+      if (openSettingsBtn) {
+          openSettingsBtn.addEventListener('click', () => {
+              if (settingsModal) {
+                  openSettingsModal();
+              }
+          });
+      }
+
+      if (closeSettingsBtn) {
+          closeSettingsBtn.addEventListener('click', closeSettingsModal);
+      }
+
+      if (closeModalXBtn) {
+          closeModalXBtn.addEventListener('click', closeSettingsModal);
+      }
+
+      if (saveSettingsBtn) {
+          saveSettingsBtn.addEventListener('click', saveSettings);
+      }
+
+      // Initialize textarea functionality
       if (textarea) {
-        // Set initial height and focus
-        textarea.style.height = '24px';
-        textarea.focus();
-
-        // Auto-resize function
-        function autoResize() {
           textarea.style.height = '24px';
-          textarea.style.height = Math.min(Math.max(textarea.scrollHeight, 24), 200) + 'px';
-        }
+          textarea.focus();
 
-        // Add event listeners
-        textarea.addEventListener('input', autoResize);
-        
-        // Handle Enter key
-        textarea.addEventListener('keydown', function(e) {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            const message = textarea.value.trim();
-            if (message || attachedFiles.length > 0) {
-              sendMessage(message);
-              textarea.value = '';
+          const autoResize = () => {
               textarea.style.height = '24px';
-            }
-          }
-        });
+              textarea.style.height = Math.min(Math.max(textarea.scrollHeight, 24), 200) + 'px';
+          };
+
+          textarea.addEventListener('input', autoResize);
+          textarea.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  const message = textarea.value.trim();
+                  if (message || attachedFiles.length > 0) {
+                      sendMessage(message);
+                      textarea.value = '';
+                      textarea.style.height = '24px';
+                  }
+              }
+          });
       }
 
-      // Handle send button click
+      // Initialize send button
       if (sendBtn) {
-        sendBtn.addEventListener('click', () => {
-          const message = textarea.value.trim();
-          if (message || attachedFiles.length > 0) {
-            sendMessage(message);
-            textarea.value = '';
-            textarea.style.height = '24px';
-          }
-        });
+          sendBtn.addEventListener('click', () => {
+              const message = textarea.value.trim();
+              if (message || attachedFiles.length > 0) {
+                  sendMessage(message);
+                  textarea.value = '';
+                  textarea.style.height = '24px';
+              }
+          });
       }
 
-      // Handle web search toggle
+      // Initialize web search button
       if (webSearchBtn) {
-        webSearchBtn.addEventListener('click', toggleWebSearch);
-        
-        // Initialize web search state
-        const savedWebSearch = localStorage.getItem('webSearchEnabled') === 'true';
-        if (savedWebSearch) {
-          enableWebSearch = true;
-          webSearchBtn.style.backgroundColor = 'var(--accent-primary)';
-          webSearchBtn.style.color = 'white';
-        }
+          webSearchBtn.addEventListener('click', toggleWebSearch);
+          const savedWebSearch = localStorage.getItem('webSearchEnabled') === 'true';
+          if (savedWebSearch) {
+              enableWebSearch = true;
+              webSearchBtn.style.backgroundColor = 'var(--accent-primary)';
+              webSearchBtn.style.color = 'white';
+          }
       }
 
-      // Initialize self-reflection
+      // Initialize thread management buttons
+      const newThreadBtn = document.getElementById('newThreadBtn');
+      const deleteThreadBtn = document.getElementById('deleteThreadBtn');
+      const clearThreadBtn = document.getElementById('clearThreadBtn');
+
+      if (newThreadBtn) {
+          newThreadBtn.addEventListener('click', createNewThread);
+      }
+
+      if (deleteThreadBtn) {
+          deleteThreadBtn.addEventListener('click', deleteCurrentThread);
+      }
+
+      if (clearThreadBtn) {
+          clearThreadBtn.addEventListener('click', () => {
+              if (confirm("Clear all messages in this thread?")) {
+                  const thread = threads.find(t => t.id === currentThreadId);
+                  if (thread) {
+                      thread.messages = [];
+                      renderCurrentThreadMessages();
+                      showNotification("Thread cleared");
+                  }
+              }
+          });
+      }
+
+      // Initialize download buttons
+      const downloadTxtBtn = document.getElementById('downloadTxtBtn');
+      const downloadPdfBtn = document.getElementById('downloadPdfBtn');
+
+      if (downloadTxtBtn) {
+          downloadTxtBtn.addEventListener('click', downloadCurrentThreadAsTxt);
+      }
+
+      if (downloadPdfBtn) {
+          downloadPdfBtn.addEventListener('click', downloadCurrentThreadAsPdf);
+      }
+
+      // Initialize settings UI
+      setupTabNavigation();
+      setupModelInput();
+      setupCODOptions();
+      setupEnhancedReasoningOptions();
+      setupSliders();
       initSelfReflection();
-      
-      // Initialize the rest of the app
-      init();
-    });
 
-    // Remove the duplicate event listeners from initEventListeners function
-    function initEventListeners() {
-      try {
-        console.log("Initializing event listeners");
-        
-        // Helper function to safely add event listeners
-        const addListener = (id, event, handler) => {
-          const element = document.getElementById(id);
-          if (element) {
-            element.addEventListener(event, handler);
-          } else {
-            console.warn(`Element with id "${id}" not found for event listener`);
-          }
-        };
-        
-        // Settings buttons
-        addListener("openSettings", "click", openSettingsModal);
-        addListener("closeSettings", "click", closeSettingsModal);
-        addListener("closeModalX", "click", closeSettingsModal);
-        addListener("saveSettings", "click", saveSettings);
-        
-        // Thread management
-        addListener("newThreadBtn", "click", createNewThread);
-        addListener("deleteThreadBtn", "click", deleteCurrentThread);
-        addListener("downloadTxtBtn", "click", downloadCurrentThreadAsTxt);
-        addListener("downloadPdfBtn", "click", downloadCurrentThreadAsPdf);
-        
-        // Initialize file upload handling
-        handleFileInput();
-        
-        // Close modal when clicking outside
-        window.addEventListener("click", (event) => {
-          const modal = document.getElementById("settingsModal");
-          if (modal && event.target === modal) {
-            closeSettingsModal();
-          }
-        });
-        
-        // Set up settings UI functionality
-        setTimeout(() => {
-          try {
-            setupTabNavigation();
-            setupModelInput();
-            setupCODOptions();
-            setupEnhancedReasoningOptions();
-            setupSliders();
-            initSelfConsistency();
-            console.log("UI functionality setup complete");
-          } catch (err) {
-            console.error("Error setting up UI functionality:", err);
-          }
-        }, 100);
-      } catch (err) {
-        console.error("Error initializing event listeners:", err);
+      // Initialize feedback form
+      initFeedbackForm();
+
+      // Create first thread
+      createNewThread();
+
+      // Load persisted settings
+      loadPersistedSettings();
+      updateCurrentModelDisplay();
+
+      // If no model is selected, open settings modal
+      if (!MODEL_NAME) {
+          setTimeout(openSettingsModal, 1000);
       }
-    }
-
-    // Remove the duplicate handleSendMessage function since we're handling it directly in the event listeners
+    });
 
     /***********************
      * File Upload Management

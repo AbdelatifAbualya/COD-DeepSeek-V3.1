@@ -2529,10 +2529,10 @@
 
       <label for="maxTokens">Max Tokens</label>
       <div class="range-container">
-        <input type="range" id="maxTokens" min="256" max="128000" step="128" value="4096">
+        <input type="range" id="maxTokens" min="1" max="8192" step="128" value="4096">
         <span id="maxTokensValue" class="range-value">4096</span>
       </div>
-      <p style="font-size: 0.8rem; color: #aaa; margin-top: 0;">Maximum length of the response (up to 128k tokens).</p>
+      <p style="font-size: 0.8rem; color: #aaa; margin-top: 0;">Maximum length of the response (1-8192 tokens for DeepSeek models).</p>
     </div>
     
     <div style="text-align: right; margin-top: 20px;">
@@ -3855,7 +3855,7 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
       // Get web search state
       const webSearchEnabled = localStorage.getItem('webSearchEnabled') === 'true';
       
-      // NEW: Analyze problem complexity if enhanced reasoning is enabled
+      // Analyze problem complexity if enhanced reasoning is enabled
       if (ENHANCED_REASONING_ENABLED && REASONING_ENHANCEMENT === "adaptive") {
         analyzeProblemComplexity(message);
       }
@@ -3885,12 +3885,20 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
       const wordCountRequest = parseWordCountRequest(message);
       
       // Add message showing we're thinking
-      addMessageToCurrentThread("Bot is typing...", "bot", true);
+      addMessageToCurrentThread("Bot is thinking...", "bot", true);
       const thread = threads.find(t => t.id === currentThreadId);
       const placeholderIndex = thread.messages.length - 1;
 
       // Build messages array with current settings and word count request
       const messagesForApi = buildMessagesForChat(wordCountRequest);
+
+      // New: Validate max_tokens before sending to API
+      // DeepSeek models accept 1-8192 tokens
+      let validatedMaxTokens = MAX_TOKENS;
+      if (validatedMaxTokens < 1 || validatedMaxTokens > 8192) {
+        validatedMaxTokens = Math.min(Math.max(1, validatedMaxTokens), 8192);
+        console.warn(`Adjusted max_tokens from ${MAX_TOKENS} to ${validatedMaxTokens} to meet DeepSeek API requirements`);
+      }
 
       try {
         // Detect if the messages are too long
@@ -3902,14 +3910,11 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           console.log(`Large prompt detected (est. ${Math.round(estimatedTokens)} tokens). Reducing max_tokens to avoid timeouts.`);
         }
         
-        // Original MAX_TOKENS value
-        const originalMaxTokens = MAX_TOKENS;
-        
         // For large prompts, reduce the max_tokens to prevent timeouts
         const adjustedMaxTokens = estimatedTokens > 2000 ? 
-          Math.min(2048, MAX_TOKENS) : MAX_TOKENS;
+          Math.min(4096, validatedMaxTokens) : validatedMaxTokens;
         
-        // Create payload for Netlify function with adjusted max_tokens
+        // Create payload for API request with adjusted max_tokens
         const payload = {
           model: MODEL_NAME,
           messages: messagesForApi,
@@ -3923,9 +3928,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         const timestamp = new Date().getTime();
         const cacheBuster = `?t=${timestamp}`;
         
-        // Set a client-side timeout that's a bit longer than the edge function timeout
+        // Set a client-side timeout that's longer than the server timeout
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+        const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 seconds timeout
         
         console.log("Sending request to Edge Function endpoint...");
         
@@ -3947,9 +3952,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           if (response.ok) {
             const data = await response.json();
             const botReply = data.choices &&
-                           data.choices[0] &&
-                           data.choices[0].message &&
-                           data.choices[0].message.content;
+                             data.choices[0] &&
+                             data.choices[0].message &&
+                             data.choices[0].message.content;
 
             if (botReply) {
               const trimmedReply = botReply.trim();
@@ -3988,7 +3993,23 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           } else {
             // If Edge Function returned an error response, try the fallback
             console.log(`Edge Function returned error ${response.status}, trying fallback...`);
-            throw new Error(`Edge Function returned status: ${response.status}`);
+            
+            // Try to parse the error response
+            let errorText = "Unknown error";
+            try {
+              const errorResponse = await response.json();
+              errorText = errorResponse.message || errorResponse.error || `Status code: ${response.status}`;
+              
+              // If it's a max_tokens issue, log the details
+              if (errorText.includes('max_tokens')) {
+                console.error(`Max tokens validation error: ${errorText}`);
+                console.log(`Current max_tokens value: ${adjustedMaxTokens}`);
+              }
+            } catch (e) {
+              console.error("Failed to parse error response:", e);
+            }
+            
+            throw new Error(`Edge Function returned status: ${response.status} - ${errorText}`);
           }
         } catch (edgeError) {
           // If Edge Function failed completely, try the fallback
@@ -4000,59 +4021,96 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
             renderCurrentThreadMessages();
           }
           
-          // Try the fallback serverless function
-          const fallbackResponse = await fetch(`${FALLBACK_API_URL}${cacheBuster}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payload)
-          });
+          // Set a longer timeout for the fallback function
+          const fallbackController = new AbortController();
+          const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 60000); // 60 seconds timeout
           
-          if (!fallbackResponse.ok) {
-            throw new Error(`Both endpoints failed. Status: ${fallbackResponse.status}`);
-          }
-          
-          // Process the fallback response
-          const fallbackData = await fallbackResponse.json();
-          const botReply = fallbackData.choices &&
-                         fallbackData.choices[0] &&
-                         fallbackData.choices[0].message &&
-                         fallbackData.choices[0].message.content;
+          try {
+            // Try the fallback serverless function with the fixed max_tokens
+            const fallbackResponse = await fetch(`${FALLBACK_API_URL}${cacheBuster}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                ...payload,
+                max_tokens: Math.min(8192, adjustedMaxTokens) // Ensure within DeepSeek limits
+              }),
+              signal: fallbackController.signal
+            });
+            
+            // Clear the fallback timeout
+            clearTimeout(fallbackTimeoutId);
+            
+            if (!fallbackResponse.ok) {
+              // Try to get detailed error from response
+              let errorMsg = `Status: ${fallbackResponse.status}`;
+              try {
+                const errorData = await fallbackResponse.json();
+                errorMsg = errorData.message || errorData.error || errorMsg;
+              } catch (e) {
+                // If we can't parse JSON, try text
+                try {
+                  errorMsg = await fallbackResponse.text();
+                } catch (e2) {
+                  // If all else fails, use status code
+                  errorMsg = `Status: ${fallbackResponse.status}`;
+                }
+              }
+              
+              throw new Error(`Both endpoints failed. ${errorMsg}`);
+            }
+            
+            // Process the fallback response
+            const fallbackData = await fallbackResponse.json();
+            const botReply = fallbackData.choices &&
+                           fallbackData.choices[0] &&
+                           fallbackData.choices[0].message &&
+                           fallbackData.choices[0].message.content;
 
-          if (botReply) {
-            const trimmedReply = botReply.trim() + "\n\n*Note: This response was generated using the fallback API endpoint.*";
-            
-            // Create response metadata
-            let reasoningInfo = REASONING_METHOD.toUpperCase();
-            if (REASONING_METHOD === "cod") {
-              reasoningInfo += `-${COD_WORD_LIMIT}`;
+            if (botReply) {
+              const trimmedReply = botReply.trim() + "\n\n*Note: This response was generated using the fallback API endpoint.*";
+              
+              // Create response metadata
+              let reasoningInfo = REASONING_METHOD.toUpperCase();
+              if (REASONING_METHOD === "cod") {
+                reasoningInfo += `-${COD_WORD_LIMIT}`;
+              }
+              
+              // Add enhanced reasoning info if used
+              if (ENHANCED_REASONING_ENABLED && 
+                  REASONING_ENHANCEMENT === "adaptive" && 
+                  PROBLEM_COMPLEXITY.complexity === "complex") {
+                reasoningInfo += "-ENHANCED";
+              }
+              
+              // Process bot message to separate thinking and answer parts
+              const processed = processBotMessage(trimmedReply, REASONING_METHOD);
+              
+              thread.messages[placeholderIndex] = {
+                content: trimmedReply,
+                sender: "bot",
+                isPlaceholder: false,
+                timestamp: new Date(),
+                wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
+                reasoningMethod: reasoningInfo,
+                thinking: processed.thinking,
+                answer: processed.answer,
+                thinkingWordCount: processed.thinkingWordCount || 0,
+                answerWordCount: processed.answerWordCount || 0
+              };
+              renderCurrentThreadMessages();
+              return;
+            } else {
+              throw new Error("No valid response from fallback endpoint");
             }
-            
-            // Add enhanced reasoning info if used
-            if (ENHANCED_REASONING_ENABLED && 
-                REASONING_ENHANCEMENT === "adaptive" && 
-                PROBLEM_COMPLEXITY.complexity === "complex") {
-              reasoningInfo += "-ENHANCED";
+          } catch (fallbackError) {
+            // Both edge function and fallback failed
+            if (fallbackError.name === 'AbortError') {
+              throw new Error("The fallback API also timed out. Try reducing max_tokens or using a simpler query.");
+            } else {
+              throw fallbackError;
             }
-            
-            // Process bot message to separate thinking and answer parts
-            const processed = processBotMessage(trimmedReply, REASONING_METHOD);
-            
-            thread.messages[placeholderIndex] = {
-              content: trimmedReply,
-              sender: "bot",
-              isPlaceholder: false,
-              timestamp: new Date(),
-              wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
-              reasoningMethod: reasoningInfo,
-              thinking: processed.thinking,
-              answer: processed.answer,
-              thinkingWordCount: processed.thinkingWordCount || 0,
-              answerWordCount: processed.answerWordCount || 0
-            };
-          } else {
-            throw new Error("No valid response from fallback endpoint");
           }
         }
       } catch (error) {
@@ -4060,20 +4118,23 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         
         let errorMessage = "Error communicating with API: " + error.message;
         
+        // Check for specific error types and provide helpful messages
         if (error.name === "AbortError") {
-          errorMessage = "Request timed out. Try again with a shorter question or request less detailed responses.";
+          errorMessage = "Request timed out. Try again with a shorter question or reduce max_tokens in settings.";
         } else if (error.message.includes("401")) {
-          errorMessage += "\n\nAuthentication failed. Please check if your DeepSeek API key is properly set in Netlify environment variables.";
+          errorMessage = "Authentication failed. Please check if your DeepSeek API key is properly set in Netlify environment variables.";
         } else if (error.message.includes("429")) {
-          errorMessage += "\n\nRate limit exceeded. Please wait a moment before trying again.";
+          errorMessage = "Rate limit exceeded. Please wait a moment before trying again.";
         } else if (error.message.includes("500")) {
-          errorMessage += "\n\nServer error. Please try again later.";
+          errorMessage = "Server error. Please try again later.";
         } else if (error.message.includes("502") || error.message.includes("504")) {
-          errorMessage = "The API took too long to respond. Try asking a simpler question or adjust the max tokens in settings.";
+          errorMessage = "The API took too long to respond. Try reducing max_tokens in settings (should be 8192 or less).";
         } else if (error.message.includes("Failed to fetch")) {
-          errorMessage += "\n\nCould not connect to the API. Please check your internet connection and try again.";
+          errorMessage = "Could not connect to the API. Please check your internet connection and try again.";
         } else if (error.message.includes("Both endpoints failed")) {
-          errorMessage = "Both primary and fallback API endpoints failed. Please try again later.";
+          errorMessage = "Both primary and fallback API endpoints failed. Please try again later with reduced max_tokens.";
+        } else if (error.message.includes("max_tokens")) {
+          errorMessage = "The DeepSeek API requires max_tokens to be between 1 and 8192. Please adjust your settings.";
         }
         
         thread.messages[placeholderIndex] = {
@@ -4088,8 +4149,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           thinkingWordCount: 0,
           answerWordCount: 0
         };
+        
+        renderCurrentThreadMessages();
       }
-      renderCurrentThreadMessages();
     }
 
     /***********************
@@ -4536,6 +4598,23 @@ Separate your steps with periods. Write your final answer after the #### separat
             valueDisplay.textContent = slider.value;
           });
         }
+        
+        // Special handling for max tokens slider to enforce DeepSeek's limits
+        if (slider.id === "maxTokens") {
+          // DeepSeek API accepts 1-8192 tokens
+          slider.setAttribute("max", "8192");
+          slider.setAttribute("min", "1");
+          
+          // Update the displayed value to match the valid range
+          const currentValue = parseInt(slider.value);
+          if (currentValue > 8192) {
+            slider.value = 8192;
+            if (valueDisplay) valueDisplay.textContent = 8192;
+          } else if (currentValue < 1) {
+            slider.value = 1;
+            if (valueDisplay) valueDisplay.textContent = 1;
+          }
+        }
       });
     }
     
@@ -4708,7 +4787,7 @@ Separate your steps with periods. Write your final answer after the #### separat
           console.error("Error getting self-reflection settings:", selfErr);
         }
         
-        // Save generation parameters safely
+        // Save generation parameters safely with validation
         try {
           const tempSlider = document.getElementById("temp");
           if (tempSlider) {
@@ -4723,7 +4802,17 @@ Separate your steps with periods. Write your final answer after the #### separat
           
           const maxTokensSlider = document.getElementById("maxTokens");
           if (maxTokensSlider) {
-            MAX_TOKENS = parseInt(maxTokensSlider.value);
+            // Enforce DeepSeek's max_tokens limits (1-8192)
+            const rawMaxTokens = parseInt(maxTokensSlider.value);
+            MAX_TOKENS = Math.min(Math.max(1, rawMaxTokens), 8192);
+            
+            // Update the slider and display if needed
+            if (MAX_TOKENS !== rawMaxTokens) {
+              maxTokensSlider.value = MAX_TOKENS;
+              const valueDisplay = document.getElementById('maxTokensValue');
+              if (valueDisplay) valueDisplay.textContent = MAX_TOKENS;
+              console.log(`Adjusted max_tokens from ${rawMaxTokens} to ${MAX_TOKENS} to meet DeepSeek API requirements`);
+            }
           }
           
           console.log("Parameters saved:", {TEMPERATURE, TOP_P, MAX_TOKENS});
@@ -4731,7 +4820,7 @@ Separate your steps with periods. Write your final answer after the #### separat
           console.error("Error getting parameters:", paramsErr);
         }
         
-        // Check if localStorage is available
+        // Check if localStorage is available and save settings
         const isLocalStorageAvailable = (() => {
           try {
             localStorage.setItem('test', 'test');
@@ -4761,7 +4850,6 @@ Separate your steps with periods. Write your final answer after the #### separat
             console.log("Settings saved to localStorage");
           } catch (storageErr) {
             console.error("Error saving to localStorage:", storageErr);
-            // Continue without localStorage - settings will still work for this session
           }
         } else {
           console.warn("localStorage not available - settings will not persist after page refresh");
@@ -5342,6 +5430,45 @@ Separate your steps with periods. Write your final answer after the #### separat
       // Show notification
       showNotification(enableWebSearch ? 'Web search enabled' : 'Web search disabled');
     }
+
+    function updateMaxTokensUI() {
+      const maxTokensSlider = document.getElementById('maxTokens');
+      const maxTokensLabel = document.querySelector('label[for="maxTokens"]');
+      
+      if (maxTokensSlider) {
+        // Update slider attributes
+        maxTokensSlider.setAttribute('min', '1');
+        maxTokensSlider.setAttribute('max', '8192');
+        maxTokensSlider.setAttribute('step', '128');
+        
+        // Check if current value is out of bounds
+        const currentValue = parseInt(maxTokensSlider.value);
+        if (currentValue > 8192) {
+          maxTokensSlider.value = 8192;
+          const valueDisplay = document.getElementById('maxTokensValue');
+          if (valueDisplay) valueDisplay.textContent = 8192;
+        } else if (currentValue < 1) {
+          maxTokensSlider.value = 1;
+          const valueDisplay = document.getElementById('maxTokensValue');
+          if (valueDisplay) valueDisplay.textContent = 1;
+        }
+      }
+      
+      if (maxTokensLabel) {
+        maxTokensLabel.title = "Valid range: 1-8192 tokens for DeepSeek models";
+      }
+      
+      // Update the helper text
+      const helperText = document.querySelector('p[style*="max-tokens"]');
+      if (helperText) {
+        helperText.textContent = "Maximum length of the response (1-8192 tokens for DeepSeek models).";
+      }
+    }
+
+    // Add this to the DOMContentLoaded event listener
+    document.addEventListener('DOMContentLoaded', function() {
+      setTimeout(updateMaxTokensUI, 500);
+    });
   </script>
   <form hidden="" method="post" name="feedback" data-netlify="true">
     <input type="hidden" name="form-name" value="feedback">

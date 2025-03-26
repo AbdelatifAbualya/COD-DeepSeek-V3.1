@@ -14,6 +14,12 @@
       "dest": "/api/fallback-proxy.js"
     }
   ],
+  "functions": {
+    "api/*.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  },
   "env": {
     "PERPLEXITY_API_KEY": "@perplexity-api-key",
     "FIREWORKS_API_KEY": "@fireworks-api-key"

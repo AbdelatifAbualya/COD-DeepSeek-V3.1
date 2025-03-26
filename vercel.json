@@ -2,6 +2,10 @@
   "version": 2,
   "routes": [
     {
+      "src": "/api/streaming",
+      "dest": "/api/streaming-proxy.js"
+    },
+    {
       "src": "/api/perplexity",
       "dest": "/api/perplexity.js"
     },

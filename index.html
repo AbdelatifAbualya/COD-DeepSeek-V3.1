@@ -4092,12 +4092,27 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           const perplexityResponse = await queryPerplexity(message);
           
           if (perplexityResponse.error) {
-            throw new Error(perplexityResponse.error);
+            // Instead of throwing an error, update the placeholder message with the error
+            thread.messages[placeholderIndex] = {
+              content: perplexityResponse.answer,
+              sender: "bot",
+              isPlaceholder: false,
+              timestamp: new Date(),
+              wordCount: countWords(perplexityResponse.answer),
+              reasoningMethod: "PERPLEXITY",
+              thinking: null,
+              answer: perplexityResponse.answer,
+              thinkingWordCount: 0,
+              answerWordCount: countWords(perplexityResponse.answer),
+              webSearchUsed: true
+            };
+            renderCurrentThreadMessages();
+            return;
           }
           
           // Format the response with sources
           const formattedResponse = perplexityResponse.answer + 
-                                   formatPerplexitySources(perplexityResponse.sources);
+                                  formatPerplexitySources(perplexityResponse.sources);
           
           // Update the message in the thread
           thread.messages[placeholderIndex] = {
@@ -4112,7 +4127,8 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
             thinkingWordCount: 0,
             answerWordCount: countWords(formattedResponse),
             perplexitySources: perplexityResponse.sources,
-            perplexityMetadata: perplexityResponse.metadata
+            perplexityMetadata: perplexityResponse.metadata,
+            webSearchUsed: true
           };
           
           renderCurrentThreadMessages();
@@ -5418,8 +5434,8 @@ Separate your steps with periods. Write your final answer after the #### separat
         }
         
         // Initialize Perplexity button
-        initPerplexityButton();
-        console.log("Perplexity toggle initialized");
+        initWebSearch();
+        console.log("Web search toggle initialized");
         
         // Initialize the rest of the application
         await init();
@@ -5687,15 +5703,31 @@ Separate your steps with periods. Write your final answer after the #### separat
       const btn = document.getElementById('webSearchBtn');
       if (!btn) return;
       
+      // Toggle the state
       enableWebSearch = !enableWebSearch;
-      localStorage.setItem('webSearchEnabled', enableWebSearch);
       
-      // Update button appearance
-      btn.style.backgroundColor = enableWebSearch ? 'var(--accent-primary)' : 'var(--bg-component)';
-      btn.style.color = enableWebSearch ? 'white' : 'var(--text-secondary)';
+      // Keep these settings in sync
+      usePerplexity = enableWebSearch;
+      
+      // Store preference - save both for backward compatibility
+      localStorage.setItem('webSearchEnabled', enableWebSearch.toString());
+      localStorage.setItem('usePerplexity', enableWebSearch.toString());
+      
+      // Update button appearance with transition
+      if (enableWebSearch) {
+        btn.style.backgroundColor = 'var(--accent-primary)';
+        btn.style.color = 'white';
+        btn.title = "Web search is enabled (click to disable)";
+      } else {
+        btn.style.backgroundColor = 'var(--bg-component)';
+        btn.style.color = 'var(--text-secondary)';
+        btn.title = "Web search is disabled (click to enable)";
+      }
       
       // Show notification
       showNotification(enableWebSearch ? 'Web search enabled' : 'Web search disabled');
+      
+      console.log(`Web search ${enableWebSearch ? 'enabled' : 'disabled'}`);
     }
 
     function updateMaxTokensUI() {
@@ -5732,11 +5764,6 @@ Separate your steps with periods. Write your final answer after the #### separat
       }
     }
 
-    // Add this to the DOMContentLoaded event listener
-    document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(updateMaxTokensUI, 500);
-    });
-
     /***********************
      * Perplexity Integration
      ***********************/
@@ -5750,78 +5777,169 @@ Separate your steps with periods. Write your final answer after the #### separat
         
         console.log("Querying Perplexity for:", question);
         
+        // Set a reasonable timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+        
         const response = await fetch(`/api/perplexity${cacheBuster}`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ query: question })
+          body: JSON.stringify({ query: question }),
+          signal: controller.signal
         });
         
+        // Clear the timeout
+        clearTimeout(timeoutId);
+        
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(`Perplexity API error: ${errorData.error || response.status}`);
+          let errorMessage = `Status: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorData.message || errorMessage;
+          } catch (e) {
+            // If we can't parse JSON, try text
+            try {
+              errorMessage = await response.text() || errorMessage;
+            } catch (e2) {
+              // If all else fails, use status code
+              errorMessage = `Status: ${response.status}`;
+            }
+          }
+          throw new Error(`Perplexity API error: ${errorMessage}`);
         }
         
         const data = await response.json();
-        console.log("Perplexity response:", data);
-        return data;
+        
+        // Check the response structure and handle different possible formats
+        if (!data) {
+          throw new Error("Empty response from Perplexity API");
+        }
+        
+        // Handle case where data.answer exists
+        if (data.answer) {
+          return {
+            answer: data.answer,
+            sources: data.sources || [],
+            metadata: data.metadata || {}
+          };
+        }
+        
+        // Handle case where data.text exists (alternate format)
+        if (data.text) {
+          return {
+            answer: data.text,
+            sources: data.citations || data.sources || [],
+            metadata: data.metadata || {}
+          };
+        }
+        
+        // Handle case where data is directly the answer string
+        if (typeof data === 'string') {
+          return {
+            answer: data,
+            sources: [],
+            metadata: {}
+          };
+        }
+        
+        // If we get here, we don't recognize the response format
+        console.warn("Unrecognized Perplexity response format:", data);
+        throw new Error("Invalid response format from Perplexity API");
+        
       } catch (error) {
         console.error("Perplexity query error:", error);
-        showNotification("Perplexity query failed: " + error.message);
-        return { error: error.message };
+        
+        // Handle specific error types
+        let errorMessage = error.message;
+        if (error.name === "AbortError") {
+          errorMessage = "Request to Perplexity timed out. Please try again or use a shorter query.";
+        } else if (error.message.includes("Failed to fetch")) {
+          errorMessage = "Could not connect to the Perplexity API. Please check your internet connection.";
+        }
+        
+        return { 
+          error: error.message,
+          answer: `Error accessing Perplexity: ${errorMessage}. Please try again later or disable web search.`,
+          sources: []
+        };
       }
     }
     
     // Format Perplexity sources for display
     function formatPerplexitySources(sources) {
-      if (!sources || sources.length === 0) {
+      if (!sources || !Array.isArray(sources) || sources.length === 0) {
         return "";
       }
       
       let formattedSources = "\n\n**Sources:**\n";
+      
       sources.forEach((source, index) => {
-        formattedSources += `${index + 1}. [${source.title || source.url}](${source.url})\n`;
+        // Handle different source formats that might be returned from the API
+        if (typeof source === 'string') {
+          // Handle simple string URLs
+          formattedSources += `${index + 1}. [Source ${index + 1}](${source})\n`;
+        } else if (typeof source === 'object') {
+          // For object-based sources, extract title and URL
+          const title = source.title || source.name || source.display_url || source.url || `Source ${index + 1}`;
+          const url = source.url || source.link || "#";
+          
+          // Format as Markdown link
+          formattedSources += `${index + 1}. [${title}](${url})\n`;
+          
+          // If there's a snippet/extract, include it
+          if (source.snippet || source.extract || source.description) {
+            const extract = source.snippet || source.extract || source.description;
+            formattedSources += `   "${extract.substring(0, 150)}${extract.length > 150 ? '...' : ''}"\n`;
+          }
+        }
       });
       
       return formattedSources;
     }
     
-    // Toggle between DeepSeek and Perplexity
-    let usePerplexity = false;
-    
-    function togglePerplexity() {
+    // Initialize the web search button state on page load
+    function initWebSearch() {
       const btn = document.getElementById('webSearchBtn');
       if (!btn) return;
       
-      usePerplexity = !usePerplexity;
-      localStorage.setItem('usePerplexity', usePerplexity);
+      // Update button tooltip with more informative text
+      btn.title = "Toggle web search with Perplexity";
+      
+      // Load saved preference - check both keys for backward compatibility
+      const webSearchEnabled = localStorage.getItem('webSearchEnabled') === 'true';
+      const perplexityEnabled = localStorage.getItem('usePerplexity') === 'true';
+      
+      // Use either setting, prioritizing webSearchEnabled
+      enableWebSearch = webSearchEnabled || perplexityEnabled;
+      usePerplexity = enableWebSearch; // Make sure they stay in sync
+      
+      // Update both settings to be consistent
+      localStorage.setItem('webSearchEnabled', enableWebSearch.toString());
+      localStorage.setItem('usePerplexity', enableWebSearch.toString());
       
       // Update button appearance
-      btn.style.backgroundColor = usePerplexity ? 'var(--accent-primary)' : 'var(--bg-component)';
-      btn.style.color = usePerplexity ? 'white' : 'var(--text-secondary)';
-      
-      // Show notification
-      showNotification(usePerplexity ? 'Perplexity enabled' : 'Perplexity disabled');
-    }
-    
-    // Initialize the toggle button state on page load
-    function initPerplexityButton() {
-      const btn = document.getElementById('webSearchBtn');
-      if (!btn) return;
-      
-      // Update button icon and tooltip
-      btn.title = "Toggle Perplexity Web Search";
-      
-      // Load saved preference
-      usePerplexity = localStorage.getItem('usePerplexity') === 'true';
-      if (usePerplexity) {
+      if (enableWebSearch) {
         btn.style.backgroundColor = 'var(--accent-primary)';
         btn.style.color = 'white';
+        btn.title = "Web search is enabled (click to disable)";
+      } else {
+        btn.style.backgroundColor = 'var(--bg-component)';
+        btn.style.color = 'var(--text-secondary)';
+        btn.title = "Web search is disabled (click to enable)";
       }
       
-      // Add event listener
-      btn.addEventListener('click', togglePerplexity);
+      // Add event listener with error handling
+      try {
+        // Remove any existing listeners to prevent duplicates
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        newBtn.addEventListener('click', toggleWebSearch);
+        console.log("Web search button event listener initialized successfully");
+      } catch (error) {
+        console.error("Error setting up web search button:", error);
+      }
     }
   </script>
   <form hidden="" method="post" name="feedback" data-netlify="true">

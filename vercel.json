@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "routes": [
+    {
+      "src": "/api/perplexity",
+      "dest": "/api/perplexity.js"
+    },
+    {
+      "src": "/api/proxy",
+      "dest": "/api/proxy.js"
+    },
+    {
+      "src": "/api-fallback/proxy",
+      "dest": "/api/fallback-proxy.js"
+    }
+  ],
+  "env": {
+    "PERPLEXITY_API_KEY": "@perplexity-api-key",
+    "FIREWORKS_API_KEY": "@fireworks-api-key"
+  }
+}

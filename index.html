@@ -3894,9 +3894,17 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
 
       // New: Validate max_tokens before sending to API
       // DeepSeek models accept 1-8192 tokens
-      let validatedMaxTokens = MAX_TOKENS;
-      if (validatedMaxTokens < 1 || validatedMaxTokens > 8192) {
-        validatedMaxTokens = Math.min(Math.max(1, validatedMaxTokens), 8192);
+      let validatedMaxTokens = parseInt(MAX_TOKENS);
+      
+      // Ensure it's a valid number
+      if (isNaN(validatedMaxTokens) || !isFinite(validatedMaxTokens)) {
+        validatedMaxTokens = 4096; // Default to 4096 if invalid
+        console.warn(`Invalid max_tokens value, defaulting to ${validatedMaxTokens}`);
+      }
+      
+      // Enforce DeepSeek's limits
+      validatedMaxTokens = Math.min(Math.max(1, validatedMaxTokens), 8192);
+      if (validatedMaxTokens !== MAX_TOKENS) {
         console.warn(`Adjusted max_tokens from ${MAX_TOKENS} to ${validatedMaxTokens} to meet DeepSeek API requirements`);
       }
 
@@ -3905,16 +3913,17 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         const totalWords = messagesForApi.reduce((total, msg) => total + countWords(msg.content), 0);
         const estimatedTokens = totalWords * 1.5; // Rough estimate of tokens from words
         
-        // If the prompt is large, warn the user
+        // If the prompt is large, adjust max_tokens
+        let adjustedMaxTokens = validatedMaxTokens;
         if (estimatedTokens > 2000) {
           console.log(`Large prompt detected (est. ${Math.round(estimatedTokens)} tokens). Reducing max_tokens to avoid timeouts.`);
+          adjustedMaxTokens = Math.min(4096, validatedMaxTokens);
         }
         
-        // For large prompts, reduce the max_tokens to prevent timeouts
-        const adjustedMaxTokens = estimatedTokens > 2000 ? 
-          Math.min(4096, validatedMaxTokens) : validatedMaxTokens;
+        // Final validation to ensure we're within DeepSeek's limits
+        adjustedMaxTokens = Math.min(Math.max(1, adjustedMaxTokens), 8192);
         
-        // Create payload for API request with adjusted max_tokens
+        // Create payload for API request with validated max_tokens
         const payload = {
           model: MODEL_NAME,
           messages: messagesForApi,
@@ -3923,6 +3932,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           max_tokens: adjustedMaxTokens,
           stream: false
         };
+        
+        // Log the final payload for debugging
+        console.log("API payload max_tokens:", payload.max_tokens);
         
         // Add timestamp to URL to prevent caching
         const timestamp = new Date().getTime();

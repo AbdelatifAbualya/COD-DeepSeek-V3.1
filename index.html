@@ -2503,7 +2503,7 @@
               <li>This helps identify calculation mistakes, misunderstandings, or logic errors</li>
               <li>The reflection is highlighted in the UI for easy identification</li>
             </ul>
-            This approach improves accuracy with a single API call, unlike self-consistency which required multiple calls.
+            This approach improves accuracy with a single API call.
           </div>
         </div>
       </div>
@@ -4959,7 +4959,7 @@ Separate your steps with periods. Write your final answer after the #### separat
             setupCODOptions();
             setupEnhancedReasoningOptions();
             setupSliders();
-            initSelfConsistency();
+            initSelfReflection();
             console.log("UI functionality setup complete");
           } catch (err) {
             console.error("Error setting up UI functionality:", err);
@@ -5038,7 +5038,6 @@ Separate your steps with periods. Write your final answer after the #### separat
       console.log("Initializing app...");
       
       try {
-        removeGlobalSelfConsistencyVars();
         loadPersistedSettings();
         console.log("Settings loaded");
         
@@ -5059,23 +5058,23 @@ Separate your steps with periods. Write your final answer after the #### separat
         initFeedbackForm();
         console.log("Feedback form initialized");
         
-       // Add clear thread button event listener (using existing button in HTML)
-       const clearThreadBtn = document.getElementById("clearThreadBtn");
-      if (clearThreadBtn) {
-      clearThreadBtn.addEventListener("click", () => {
-      if (confirm("Clear all messages in this thread?")) {
-        const thread = threads.find(t => t.id === currentThreadId);
-        if (thread) {
-        thread.messages = [];
-        renderCurrentThreadMessages();
-        showNotification("Thread cleared");
-      }
-    }
-  });
-  console.log("Clear thread button initialized");
-} else {
-  console.warn("Clear thread button not found in DOM");
-}
+        // Add clear thread button event listener
+        const clearThreadBtn = document.getElementById("clearThreadBtn");
+        if (clearThreadBtn) {
+          clearThreadBtn.addEventListener("click", () => {
+            if (confirm("Clear all messages in this thread?")) {
+              const thread = threads.find(t => t.id === currentThreadId);
+              if (thread) {
+                thread.messages = [];
+                renderCurrentThreadMessages();
+                showNotification("Thread cleared");
+              }
+            }
+          });
+          console.log("Clear thread button initialized");
+        } else {
+          console.warn("Clear thread button not found in DOM");
+        }
         
         // Add clear thread button to the sidebar
         const sidebar = document.querySelector(".sidebar");
@@ -5095,12 +5094,6 @@ Separate your steps with periods. Write your final answer after the #### separat
             }
           }, 1000);
         }
-        
-        // No longer need this function as we've improved the tab navigation
-        // setTimeout(() => {
-        //   fixTabContentDisplay();
-        //   console.log("Fixed tab content display");
-        // }, 200);
       } catch (err) {
         console.error("Initialization error:", err);
       }
@@ -5222,7 +5215,7 @@ Separate your steps with periods. Write your final answer after the #### separat
             setupCODOptions();
             setupEnhancedReasoningOptions();
             setupSliders();
-            initSelfConsistency();
+            initSelfReflection();
             console.log("UI functionality setup complete");
           } catch (err) {
             console.error("Error setting up UI functionality:", err);

@@ -1,10 +1,7 @@
 {
   "version": 2,
+  "buildCommand": null,
   "routes": [
-    {
-      "src": "/api/streaming",
-      "dest": "/api/streaming-proxy.js"
-    },
     {
       "src": "/api/perplexity",
       "dest": "/api/perplexity.js"

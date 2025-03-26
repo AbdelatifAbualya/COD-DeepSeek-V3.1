@@ -29,14 +29,14 @@ export default async (request, context) => {
   }
 
   try {
-    // Get the DeepSeek API key from environment variables
-    const apiKey = Deno.env.get('DEEPSEEKAPI') || Deno.env.get('DEEPSEEK_API_KEY');
+    // Get the Fireworks API key from environment variables
+    const apiKey = Deno.env.get('FIREWORKS_API_KEY');
     
     if (!apiKey) {
       return new Response(
         JSON.stringify({
           error: 'API key not configured',
-          message: 'Please set DEEPSEEKAPI in your Netlify environment variables'
+          message: 'Please set FIREWORKS_API_KEY in your Netlify environment variables'
         }),
         {
           status: 500,
@@ -71,27 +71,24 @@ export default async (request, context) => {
     // Log request information
     console.log('Request received for model:', requestBody.model || 'unknown');
     
-    // Always use DeepSeek Chat V3
-    const modelName = "deepseek-chat";
+    // Prepare request for Fireworks API
+    const apiEndpoint = 'https://api.fireworks.ai/inference/v1/chat/completions';
     
-    // Properly validate max_tokens (DeepSeek API accepts 1-8192)
+    // Validate max_tokens (Fireworks models accept different limits based on model)
     const originalMaxTokens = requestBody.max_tokens || 4096;
     const validatedMaxTokens = Math.min(Math.max(1, originalMaxTokens), 8192);
     
     if (originalMaxTokens !== validatedMaxTokens) {
-      console.log(`Adjusted max_tokens from ${originalMaxTokens} to ${validatedMaxTokens} to meet DeepSeek API requirements`);
+      console.log(`Adjusted max_tokens from ${originalMaxTokens} to ${validatedMaxTokens}`);
     }
     
-    // Prepare request for DeepSeek API
-    const apiEndpoint = 'https://api.deepseek.com/v1/chat/completions';
-    
     const cleanedParams = {
-      model: modelName,
+      model: requestBody.model,
       messages: requestBody.messages,
       max_tokens: validatedMaxTokens,
       temperature: requestBody.temperature,
       top_p: requestBody.top_p,
-      stream: false // Edge functions could support streaming but we'll keep it simple
+      stream: false
     };
 
     // Remove undefined or null values
@@ -101,7 +98,7 @@ export default async (request, context) => {
       }
     });
     
-    // Set up the DeepSeek API request
+    // Set up the Fireworks API request
     const apiRequestOptions = {
       method: 'POST',
       headers: {
@@ -111,10 +108,9 @@ export default async (request, context) => {
       body: JSON.stringify(cleanedParams)
     };
     
-    // Call the DeepSeek API with a timeout
-    // Use AbortController via Promise.race to implement timeout
+    // Call the Fireworks API with a timeout
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('Request timeout')), 28000); // 28-second timeout (slightly increased)
+      setTimeout(() => reject(new Error('Request timeout')), 28000); // 28-second timeout
     });
     
     const fetchPromise = fetch(apiEndpoint, apiRequestOptions);
@@ -136,16 +132,14 @@ export default async (request, context) => {
       
       // Handle specific errors
       if (response.status === 401) {
-        errorMessage = "Authentication failed. Please check your DeepSeek API key.";
-      } else if (response.status === 400 && errorMessage.includes('max_tokens')) {
-        errorMessage = "Invalid max_tokens value. The DeepSeek API accepts values between 1 and 8192.";
+        errorMessage = "Authentication failed. Please check your Fireworks API key.";
       } else if (response.status === 429) {
         errorMessage = "Rate limit exceeded. Please try again in a few moments.";
       }
       
       return new Response(
         JSON.stringify({
-          error: `DeepSeek API error: ${response.status}`,
+          error: `Fireworks API error: ${response.status}`,
           message: errorMessage
         }),
         {

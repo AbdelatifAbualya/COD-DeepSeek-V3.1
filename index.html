@@ -3882,7 +3882,7 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
      ***********************/
     async function sendMessage(message) {
       // Get web search state
-      const webSearchEnabled = localStorage.getItem('webSearchEnabled') === 'true';
+      const webSearchEnabled = usePerplexity;
       
       // Analyze problem complexity if enhanced reasoning is enabled
       if (ENHANCED_REASONING_ENABLED && REASONING_ENHANCEMENT === "adaptive") {
@@ -3903,62 +3903,86 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         attachedFilesContainer.style.display = 'none';
       }
       
-      if (!MODEL_NAME) {
+      if (!MODEL_NAME && !webSearchEnabled) {
         const errorMsg = "Error: Please select a DeepSeek model in the Settings.";
         addMessageToCurrentThread(errorMsg, "bot");
         console.error(errorMsg);
         return;
       }
 
-      // Parse message for word count requirements
-      const wordCountRequest = parseWordCountRequest(message);
-      
       // Add message showing we're thinking
       addMessageToCurrentThread("Bot is thinking...", "bot", true);
       const thread = threads.find(t => t.id === currentThreadId);
       const placeholderIndex = thread.messages.length - 1;
 
-      // Build messages array with current settings and word count request
-      const messagesForApi = buildMessagesForChat(wordCountRequest);
-
-      // New: Validate max_tokens before sending to API
-      // DeepSeek models accept 1-8192 tokens
-      let validatedMaxTokens = parseInt(MAX_TOKENS);
-      
-      // Ensure it's a valid number
-      if (isNaN(validatedMaxTokens) || !isFinite(validatedMaxTokens)) {
-        validatedMaxTokens = 4096; // Default to 4096 if invalid
-        console.warn(`Invalid max_tokens value, defaulting to ${validatedMaxTokens}`);
-      }
-      
-      // Enforce DeepSeek's limits
-      validatedMaxTokens = Math.min(Math.max(1, validatedMaxTokens), 8192);
-      if (validatedMaxTokens !== MAX_TOKENS) {
-        console.warn(`Adjusted max_tokens from ${MAX_TOKENS} to ${validatedMaxTokens} to meet DeepSeek API requirements`);
-      }
-
       try {
-        // Detect if the messages are too long
-        const totalWords = messagesForApi.reduce((total, msg) => total + countWords(msg.content), 0);
-        const estimatedTokens = totalWords * 1.5; // Rough estimate of tokens from words
+        let botReply = "";
+        let sources = null;
+
+        // If Perplexity is enabled, use it instead of DeepSeek
+        if (webSearchEnabled) {
+          // Query Perplexity
+          const perplexityResponse = await queryPerplexity(message);
+          
+          if (perplexityResponse.error) {
+            throw new Error(perplexityResponse.error);
+          }
+          
+          botReply = perplexityResponse.answer;
+          sources = perplexityResponse.sources;
+          
+          // Add sources if available
+          if (sources && sources.length > 0) {
+            botReply += formatPerplexitySources(sources);
+          }
+          
+          // Update the message in the thread
+          thread.messages[placeholderIndex] = {
+            content: botReply,
+            sender: "bot",
+            isPlaceholder: false,
+            timestamp: new Date(),
+            wordCount: countWords(botReply),
+            reasoningMethod: "PERPLEXITY",
+            webSearchUsed: true
+          };
+          
+          renderCurrentThreadMessages();
+          return;
+        }
+
+        // Parse message for word count requirements
+        const wordCountRequest = parseWordCountRequest(message);
         
-        // If the prompt is large, adjust max_tokens
-        let adjustedMaxTokens = validatedMaxTokens;
-        if (estimatedTokens > 2000) {
-          console.log(`Large prompt detected (est. ${Math.round(estimatedTokens)} tokens). Reducing max_tokens to avoid timeouts.`);
-          adjustedMaxTokens = Math.min(4096, validatedMaxTokens);
+        // Build messages array with current settings and word count request
+        const messagesForApi = buildMessagesForChat(wordCountRequest);
+
+        // New: Validate max_tokens before sending to API
+        // DeepSeek models accept 1-8192 tokens
+        let validatedMaxTokens = parseInt(MAX_TOKENS);
+        
+        // Ensure it's a valid number
+        if (isNaN(validatedMaxTokens) || !isFinite(validatedMaxTokens)) {
+          validatedMaxTokens = 4096; // Default to 4096 if invalid
+          console.warn(`Invalid max_tokens value, defaulting to ${validatedMaxTokens}`);
         }
         
-        // Final validation to ensure we're within DeepSeek's limits
-        adjustedMaxTokens = Math.min(Math.max(1, adjustedMaxTokens), 8192);
-        
+        // Enforce DeepSeek's limits
+        validatedMaxTokens = Math.min(Math.max(1, validatedMaxTokens), 8192);
+        if (validatedMaxTokens !== MAX_TOKENS) {
+          console.warn(`Adjusted max_tokens from ${MAX_TOKENS} to ${validatedMaxTokens} to meet DeepSeek API requirements`);
+        }
+
+        // Rest of the existing DeepSeek API call code...
+        // ... existing code ...
+
         // Create payload for API request with validated max_tokens
         const payload = {
           model: MODEL_NAME,
           messages: messagesForApi,
           temperature: TEMPERATURE,
           top_p: TOP_P,
-          max_tokens: adjustedMaxTokens,
+          max_tokens: validatedMaxTokens,
           stream: false
         };
         
@@ -4044,7 +4068,7 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
               // If it's a max_tokens issue, log the details
               if (errorText.includes('max_tokens')) {
                 console.error(`Max tokens validation error: ${errorText}`);
-                console.log(`Current max_tokens value: ${adjustedMaxTokens}`);
+                console.log(`Current max_tokens value: ${validatedMaxTokens}`);
               }
             } catch (e) {
               console.error("Failed to parse error response:", e);
@@ -4075,7 +4099,7 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
               },
               body: JSON.stringify({
                 ...payload,
-                max_tokens: Math.min(8192, adjustedMaxTokens) // Ensure within DeepSeek limits
+                max_tokens: Math.min(8192, validatedMaxTokens) // Ensure within DeepSeek limits
               }),
               signal: fallbackController.signal
             });
@@ -5208,16 +5232,8 @@ Separate your steps with periods. Write your final answer after the #### separat
           });
         }
         
-        // Initialize web search
-        if (webSearchBtn) {
-          webSearchBtn.addEventListener('click', toggleWebSearch);
-          const savedWebSearch = localStorage.getItem('webSearchEnabled') === 'true';
-          if (savedWebSearch) {
-            enableWebSearch = true;
-            webSearchBtn.style.backgroundColor = 'var(--accent-primary)';
-            webSearchBtn.style.color = 'white';
-          }
-        }
+        // Initialize Perplexity button
+        initPerplexityButton();
         
         // Initialize the rest of the application
         await init();
@@ -5534,6 +5550,93 @@ Separate your steps with periods. Write your final answer after the #### separat
     document.addEventListener('DOMContentLoaded', function() {
       setTimeout(updateMaxTokensUI, 500);
     });
+
+    /***********************
+     * Perplexity Integration
+     ***********************/
+    
+    // Function to query Perplexity
+    async function queryPerplexity(question) {
+      try {
+        // Add timestamp to URL to prevent caching
+        const timestamp = new Date().getTime();
+        const cacheBuster = `?t=${timestamp}`;
+        
+        console.log("Querying Perplexity for:", question);
+        
+        const response = await fetch(`/api/perplexity${cacheBuster}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ query: question })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Perplexity API error: ${errorData.error || response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log("Perplexity response:", data);
+        return data;
+      } catch (error) {
+        console.error("Perplexity query error:", error);
+        showNotification("Perplexity query failed: " + error.message);
+        return { error: error.message };
+      }
+    }
+    
+    // Format Perplexity sources for display
+    function formatPerplexitySources(sources) {
+      if (!sources || sources.length === 0) {
+        return "";
+      }
+      
+      let formattedSources = "\n\n**Sources:**\n";
+      sources.forEach((source, index) => {
+        formattedSources += `${index + 1}. [${source.title || source.url}](${source.url})\n`;
+      });
+      
+      return formattedSources;
+    }
+    
+    // Toggle between DeepSeek and Perplexity
+    let usePerplexity = false;
+    
+    function togglePerplexity() {
+      const btn = document.getElementById('webSearchBtn');
+      if (!btn) return;
+      
+      usePerplexity = !usePerplexity;
+      localStorage.setItem('usePerplexity', usePerplexity);
+      
+      // Update button appearance
+      btn.style.backgroundColor = usePerplexity ? 'var(--accent-primary)' : 'var(--bg-component)';
+      btn.style.color = usePerplexity ? 'white' : 'var(--text-secondary)';
+      
+      // Show notification
+      showNotification(usePerplexity ? 'Perplexity enabled' : 'Perplexity disabled');
+    }
+    
+    // Initialize the toggle button state on page load
+    function initPerplexityButton() {
+      const btn = document.getElementById('webSearchBtn');
+      if (!btn) return;
+      
+      // Update button icon and tooltip
+      btn.title = "Toggle Perplexity Web Search";
+      
+      // Load saved preference
+      usePerplexity = localStorage.getItem('usePerplexity') === 'true';
+      if (usePerplexity) {
+        btn.style.backgroundColor = 'var(--accent-primary)';
+        btn.style.color = 'white';
+      }
+      
+      // Add event listener
+      btn.addEventListener('click', togglePerplexity);
+    }
   </script>
   <form hidden="" method="post" name="feedback" data-netlify="true">
     <input type="hidden" name="form-name" value="feedback">

@@ -1,42 +1,12 @@
-# Netlify configuration file with Edge Functions support
-# This file should be in the root of your project
+# Add this to your existing netlify.toml file
 
-[build]
-  # Directory that contains the deploy-ready HTML files and assets
-  publish = "/"
-  
-  # Directory with the serverless functions (keep as fallback)
-  functions = "netlify/functions"
-
-# Edge Function configuration - primary path
+# Edge Function for Perplexity API
 [[edge_functions]]
-  path = "/api/*"
-  function = "api-proxy"
+  path = "/api/perplexity"
+  function = "perplexity"
 
-# Regular functions settings - these remain as fallback
-[functions]
-  node_bundler = "esbuild"
-  external_node_modules = ["node-fetch"]
-  included_files = []
-
-# Set up proper content-type handling
-[build.processing]
-  skip_processing = false
-
-# Configure routing for your application - primary path uses Edge Functions
+# Add this redirect for Perplexity API
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/edge-functions/api-proxy"
-  status = 200
-
-# Fallback redirect to the regular function if needed
-[[redirects]]
-  from = "/api-fallback/*"
-  to = "/.netlify/functions/api-proxy"
-  status = 200
-
-# Keep the SPA redirect
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/api/perplexity"
+  to = "/.netlify/edge-functions/perplexity"
   status = 200

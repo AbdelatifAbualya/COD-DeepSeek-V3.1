@@ -1,14 +1,14 @@
-// api/perplexity.js - Fixed version
+// api/perplexity.js - Fixed and improved version
 
 import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
-  // Add header to prevent CORS issues
+  // Add CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   
-  // Handle CORS for preflight requests
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
@@ -79,16 +79,22 @@ export default async function handler(req, res) {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        // Try to parse error response
-        let errorText = await response.text();
-        let errorMessage;
+        let errorText;
+        try {
+          errorText = await response.text();
+        } catch (e) {
+          errorText = `Error ${response.status}`;
+        }
         
+        let errorMessage;
         try {
           const errorJson = JSON.parse(errorText);
           errorMessage = errorJson.error?.message || 'Unknown API error';
         } catch {
           errorMessage = errorText || `Error ${response.status}`;
         }
+        
+        console.error(`Perplexity API error: ${response.status} - ${errorMessage}`);
         
         res.status(response.status).json({
           error: `Perplexity API error: ${response.status}`,
@@ -130,7 +136,7 @@ export default async function handler(req, res) {
       throw fetchError;
     }
   } catch (error) {
-    console.error('API error:', error.name, error.message);
+    console.error('Perplexity API error:', error.name, error.message);
     
     // Special handling for timeout errors
     let errorMessage = error.message || 'Unknown error';

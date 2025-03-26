@@ -11,6 +11,10 @@
       "dest": "/api/proxy.js"
     },
     {
+      "src": "/api/streaming",
+      "dest": "/api/streaming-proxy.js"
+    },
+    {
       "src": "/api-fallback/proxy",
       "dest": "/api/fallback-proxy.js"
     }

@@ -2906,6 +2906,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
     // Initialize global self-reflection variables
     let SELF_REFLECTION_ENABLED = true;
     
+    // Add streaming flag
+    let ENABLE_STREAMING = true; // Can be controlled via settings later
+    
     /***********************
      * Helper Functions
      ***********************/
@@ -4135,12 +4138,11 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           return;
         }
         
-        // If not using Perplexity, continue with the existing code for your DeepSeek/Fireworks models
+        // If not using Perplexity, continue with the existing code for your models
         // Build messages array with current settings and word count request
         const messagesForApi = buildMessagesForChat(wordCountRequest);
 
-        // New: Validate max_tokens before sending to API
-        // DeepSeek models accept 1-8192 tokens
+        // Validate max_tokens before sending to API
         let validatedMaxTokens = parseInt(MAX_TOKENS);
         
         // Ensure it's a valid number
@@ -4149,10 +4151,10 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           console.warn(`Invalid max_tokens value, defaulting to ${validatedMaxTokens}`);
         }
         
-        // Enforce DeepSeek's limits
+        // Enforce model's limits
         validatedMaxTokens = Math.min(Math.max(1, validatedMaxTokens), 8192);
         if (validatedMaxTokens !== MAX_TOKENS) {
-          console.warn(`Adjusted max_tokens from ${MAX_TOKENS} to ${validatedMaxTokens} to meet DeepSeek API requirements`);
+          console.warn(`Adjusted max_tokens from ${MAX_TOKENS} to ${validatedMaxTokens} to meet API requirements`);
         }
 
         // Detect if the messages are too long
@@ -4166,8 +4168,12 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           adjustedMaxTokens = Math.min(4096, validatedMaxTokens);
         }
         
-        // Final validation to ensure we're within DeepSeek's limits
+        // Final validation to ensure we're within model's limits
         adjustedMaxTokens = Math.min(Math.max(1, adjustedMaxTokens), 8192);
+        
+        // Add timestamp to URL to prevent caching
+        const timestamp = new Date().getTime();
+        const cacheBuster = `?t=${timestamp}`;
         
         // Create payload for API request with validated max_tokens
         const payload = {
@@ -4176,195 +4182,351 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           temperature: TEMPERATURE,
           top_p: TOP_P,
           max_tokens: adjustedMaxTokens,
-          stream: false
+          stream: ENABLE_STREAMING // Use the streaming flag
         };
-        
-        // Add timestamp to URL to prevent caching
-        const timestamp = new Date().getTime();
-        const cacheBuster = `?t=${timestamp}`;
-        
-        // Set a client-side timeout that's longer than the server timeout
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 seconds timeout
-        
-        console.log("Sending request to Edge Function endpoint...");
-        
-        try {
-          // First try: Send request to the Edge Function endpoint
-          const response = await fetch(`${EDGE_API_URL}${cacheBuster}`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify(payload),
-            signal: controller.signal
-          });
-          
-          // Clear the timeout
-          clearTimeout(timeoutId);
-          
-          // If successful, process the response
-          if (response.ok) {
-            const data = await response.json();
-            const botReply = data.choices &&
-                             data.choices[0] &&
-                             data.choices[0].message &&
-                             data.choices[0].message.content;
 
-            if (botReply) {
-              const trimmedReply = botReply.trim();
-              
-              // Create response metadata
-              let reasoningInfo = REASONING_METHOD.toUpperCase();
-              if (REASONING_METHOD === "cod") {
-                reasoningInfo += `-${COD_WORD_LIMIT}`;
-              }
-              
-              // Add enhanced reasoning info if used
-              if (ENHANCED_REASONING_ENABLED && 
-                  REASONING_ENHANCEMENT === "adaptive" && 
-                  PROBLEM_COMPLEXITY.complexity === "complex") {
-                reasoningInfo += "-ENHANCED";
-              }
-              
-              // Process bot message to separate thinking and answer parts
-              const processed = processBotMessage(trimmedReply, REASONING_METHOD);
-              
-              thread.messages[placeholderIndex] = {
-                content: trimmedReply,
-                sender: "bot",
-                isPlaceholder: false,
-                timestamp: new Date(),
-                wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
-                reasoningMethod: reasoningInfo,
-                thinking: processed.thinking,
-                answer: processed.answer,
-                thinkingWordCount: processed.thinkingWordCount || 0,
-                answerWordCount: processed.answerWordCount || 0
-              };
-              renderCurrentThreadMessages();
-              return;
-            }
-          } else {
-            // If Edge Function returned an error response, try the fallback
-            console.log(`Edge Function returned error ${response.status}, trying fallback...`);
-            
-            // Try to parse the error response
-            let errorText = "Unknown error";
-            try {
-              const errorResponse = await response.json();
-              errorText = errorResponse.message || errorResponse.error || `Status code: ${response.status}`;
-              
-              // If it's a max_tokens issue, log the details
-              if (errorText.includes('max_tokens')) {
-                console.error(`Max tokens validation error: ${errorText}`);
-                console.log(`Current max_tokens value: ${adjustedMaxTokens}`);
-              }
-            } catch (e) {
-              console.error("Failed to parse error response:", e);
-            }
-            
-            throw new Error(`Edge Function returned status: ${response.status} - ${errorText}`);
-          }
-        } catch (edgeError) {
-          // If Edge Function failed completely, try the fallback
-          console.log("Edge Function error, using fallback function:", edgeError.message);
-          
-          // Update placeholder message
-          if (thread.messages[placeholderIndex].isPlaceholder) {
-            thread.messages[placeholderIndex].content = "Edge Function error, trying fallback...";
-            renderCurrentThreadMessages();
-          }
-          
-          // Set a longer timeout for the fallback function
-          const fallbackController = new AbortController();
-          const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 60000); // 60 seconds timeout
+        // Check if we should use streaming
+        if (ENABLE_STREAMING) {
+          console.log("Using streaming mode for this request");
           
           try {
-            // Try the fallback serverless function with the fixed max_tokens
-            const fallbackResponse = await fetch(`${FALLBACK_API_URL}${cacheBuster}`, {
+            // Update the placeholder to indicate streaming
+            thread.messages[placeholderIndex].content = "Connecting to streaming API...";
+            renderCurrentThreadMessages();
+            
+            // Prepare to collect the full response
+            let fullResponse = "";
+            let eventSource = null;
+            
+            // First send the initial request to start the stream
+            const initResponse = await fetch(`/api/streaming${cacheBuster}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+            
+            if (!initResponse.ok) {
+              throw new Error(`Error starting stream: ${initResponse.status}`);
+            }
+            
+            // Set up event source for streaming
+            const reader = initResponse.body.getReader();
+            const decoder = new TextDecoder();
+            
+            // Flag to track if we're still receiving the first parts
+            let isFirstChunks = true;
+            
+            // Process the stream
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                console.log("Stream complete");
+                break;
+              }
+              
+              // Decode this chunk
+              const chunk = decoder.decode(value, { stream: true });
+              
+              // Process SSE format (data: {...}\n\n)
+              const lines = chunk.split('\n');
+              
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  // Extract the data part
+                  const dataText = line.slice(6);
+                  
+                  // Special end marker
+                  if (dataText === '[DONE]') {
+                    console.log("Received [DONE] marker");
+                    continue;
+                  }
+                  
+                  try {
+                    const data = JSON.parse(dataText);
+                    
+                    // Check for completion
+                    if (data.done === true) {
+                      console.log("Received done: true");
+                      continue;
+                    }
+                    
+                    // Check for errors
+                    if (data.error === true) {
+                      throw new Error(data.message || "Unknown streaming error");
+                    }
+                    
+                    // Extract new content
+                    if (data.choices && data.choices[0]) {
+                      // Get the content delta or content (different APIs may use different formats)
+                      const contentDelta = data.choices[0].delta?.content || data.choices[0].message?.content || "";
+                      
+                      if (contentDelta) {
+                        // Add to full response
+                        fullResponse += contentDelta;
+                        
+                        // Update the message
+                        thread.messages[placeholderIndex] = {
+                          content: fullResponse,
+                          sender: "bot",
+                          isPlaceholder: false,
+                          timestamp: new Date(),
+                          isStreaming: true // Flag as streaming
+                        };
+                        
+                        // Only render after significant content to avoid re-rendering too often
+                        if (isFirstChunks || fullResponse.length % 20 === 0) {
+                          renderCurrentThreadMessages();
+                          isFirstChunks = false;
+                        }
+                      }
+                    }
+                  } catch (parseError) {
+                    console.warn("Error parsing streaming data:", parseError);
+                  }
+                }
+              }
+            }
+            
+            // Stream is complete - process the full response
+            console.log("Stream complete, processing final response");
+            
+            // Create response metadata
+            let reasoningInfo = REASONING_METHOD.toUpperCase();
+            if (REASONING_METHOD === "cod") {
+              reasoningInfo += `-${COD_WORD_LIMIT}`;
+            }
+            
+            // Add enhanced reasoning info if used
+            if (ENHANCED_REASONING_ENABLED && 
+                REASONING_ENHANCEMENT === "adaptive" && 
+                PROBLEM_COMPLEXITY.complexity === "complex") {
+              reasoningInfo += "-ENHANCED";
+            }
+            
+            // Process bot message to separate thinking and answer parts
+            const processed = processBotMessage(fullResponse, REASONING_METHOD);
+            
+            // Update with the finalized message
+            thread.messages[placeholderIndex] = {
+              content: fullResponse,
+              sender: "bot",
+              isPlaceholder: false,
+              timestamp: new Date(),
+              wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
+              reasoningMethod: reasoningInfo,
+              thinking: processed.thinking,
+              answer: processed.answer,
+              thinkingWordCount: processed.thinkingWordCount || 0,
+              answerWordCount: processed.answerWordCount || 0,
+              isStreaming: false // No longer streaming
+            };
+            
+            renderCurrentThreadMessages();
+            
+          } catch (streamingError) {
+            console.error("Streaming error:", streamingError);
+            
+            // Fallback to non-streaming if streaming fails
+            console.log("Falling back to non-streaming API...");
+            thread.messages[placeholderIndex].content = "Streaming failed, falling back to regular API...";
+            renderCurrentThreadMessages();
+            
+            // Set streaming to false in the payload for fallback
+            payload.stream = false;
+            
+            // Continue with non-streaming approach below
+            ENABLE_STREAMING = false; // Temporarily disable streaming
+          }
+        }
+        
+        // Only proceed with non-streaming approach if streaming is disabled or failed
+        if (!ENABLE_STREAMING) {
+          // Set a client-side timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 35000); // 35 seconds timeout
+          
+          console.log("Sending request to Edge Function endpoint...");
+          
+          try {
+            // First try: Send request to the Edge Function endpoint
+            const response = await fetch(`${EDGE_API_URL}${cacheBuster}`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json"
               },
-              body: JSON.stringify({
-                ...payload,
-                max_tokens: Math.min(8192, adjustedMaxTokens) // Ensure within DeepSeek limits
-              }),
-              signal: fallbackController.signal
+              body: JSON.stringify(payload),
+              signal: controller.signal
             });
             
-            // Clear the fallback timeout
-            clearTimeout(fallbackTimeoutId);
+            // Clear the timeout
+            clearTimeout(timeoutId);
             
-            if (!fallbackResponse.ok) {
-              // Try to get detailed error from response
-              let errorMsg = `Status: ${fallbackResponse.status}`;
-              try {
-                const errorData = await fallbackResponse.json();
-                errorMsg = errorData.message || errorData.error || errorMsg;
-              } catch (e) {
-                // If we can't parse JSON, try text
-                try {
-                  errorMsg = await fallbackResponse.text();
-                } catch (e2) {
-                  // If all else fails, use status code
-                  errorMsg = `Status: ${fallbackResponse.status}`;
-                }
-              }
-              
-              throw new Error(`Both endpoints failed. ${errorMsg}`);
-            }
-            
-            // Process the fallback response
-            const fallbackData = await fallbackResponse.json();
-            const botReply = fallbackData.choices &&
-                          fallbackData.choices[0] &&
-                          fallbackData.choices[0].message &&
-                          fallbackData.choices[0].message.content;
+            // If successful, process the response
+            if (response.ok) {
+              const data = await response.json();
+              const botReply = data.choices &&
+                              data.choices[0] &&
+                              data.choices[0].message &&
+                              data.choices[0].message.content;
 
-            if (botReply) {
-              const trimmedReply = botReply.trim() + "\n\n*Note: This response was generated using the fallback API endpoint.*";
-              
-              // Create response metadata
-              let reasoningInfo = REASONING_METHOD.toUpperCase();
-              if (REASONING_METHOD === "cod") {
-                reasoningInfo += `-${COD_WORD_LIMIT}`;
+              if (botReply) {
+                const trimmedReply = botReply.trim();
+                
+                // Create response metadata
+                let reasoningInfo = REASONING_METHOD.toUpperCase();
+                if (REASONING_METHOD === "cod") {
+                  reasoningInfo += `-${COD_WORD_LIMIT}`;
+                }
+                
+                // Add enhanced reasoning info if used
+                if (ENHANCED_REASONING_ENABLED && 
+                    REASONING_ENHANCEMENT === "adaptive" && 
+                    PROBLEM_COMPLEXITY.complexity === "complex") {
+                  reasoningInfo += "-ENHANCED";
+                }
+                
+                // Process bot message to separate thinking and answer parts
+                const processed = processBotMessage(trimmedReply, REASONING_METHOD);
+                
+                thread.messages[placeholderIndex] = {
+                  content: trimmedReply,
+                  sender: "bot",
+                  isPlaceholder: false,
+                  timestamp: new Date(),
+                  wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
+                  reasoningMethod: reasoningInfo,
+                  thinking: processed.thinking,
+                  answer: processed.answer,
+                  thinkingWordCount: processed.thinkingWordCount || 0,
+                  answerWordCount: processed.answerWordCount || 0
+                };
+                renderCurrentThreadMessages();
+                
+                // Re-enable streaming for next message
+                ENABLE_STREAMING = true;
+                
+                return;
               }
-              
-              // Add enhanced reasoning info if used
-              if (ENHANCED_REASONING_ENABLED && 
-                  REASONING_ENHANCEMENT === "adaptive" && 
-                  PROBLEM_COMPLEXITY.complexity === "complex") {
-                reasoningInfo += "-ENHANCED";
-              }
-              
-              // Process bot message to separate thinking and answer parts
-              const processed = processBotMessage(trimmedReply, REASONING_METHOD);
-              
-              thread.messages[placeholderIndex] = {
-                content: trimmedReply,
-                sender: "bot",
-                isPlaceholder: false,
-                timestamp: new Date(),
-                wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
-                reasoningMethod: reasoningInfo,
-                thinking: processed.thinking,
-                answer: processed.answer,
-                thinkingWordCount: processed.thinkingWordCount || 0,
-                answerWordCount: processed.answerWordCount || 0
-              };
-              renderCurrentThreadMessages();
-              return;
             } else {
-              throw new Error("No valid response from fallback endpoint");
+              // If Edge Function returned an error response, try the fallback
+              console.log(`Edge Function returned error ${response.status}, trying fallback...`);
+              
+              // Try to parse the error response
+              let errorText = "Unknown error";
+              try {
+                const errorResponse = await response.json();
+                errorText = errorResponse.message || errorResponse.error || `Status code: ${response.status}`;
+              } catch (e) {
+                console.error("Failed to parse error response:", e);
+              }
+              
+              throw new Error(`Edge Function returned status: ${response.status} - ${errorText}`);
             }
-          } catch (fallbackError) {
-            // Both edge function and fallback failed
-            if (fallbackError.name === 'AbortError') {
-              throw new Error("The fallback API also timed out. Try reducing max_tokens or using a simpler query.");
-            } else {
-              throw fallbackError;
+          } catch (edgeError) {
+            // If Edge Function failed completely, try the fallback
+            console.log("Edge Function error, using fallback function:", edgeError.message);
+            
+            // Update placeholder message
+            if (thread.messages[placeholderIndex].isPlaceholder) {
+              thread.messages[placeholderIndex].content = "Edge Function error, trying fallback...";
+              renderCurrentThreadMessages();
+            }
+            
+            // Set a longer timeout for the fallback function
+            const fallbackController = new AbortController();
+            const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 60000); // 60 seconds timeout
+            
+            try {
+              // Try the fallback serverless function with the fixed max_tokens
+              const fallbackResponse = await fetch(`${FALLBACK_API_URL}${cacheBuster}`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  ...payload,
+                  max_tokens: Math.min(8192, adjustedMaxTokens) // Ensure within model limits
+                }),
+                signal: fallbackController.signal
+              });
+              
+              // Clear the fallback timeout
+              clearTimeout(fallbackTimeoutId);
+              
+              if (!fallbackResponse.ok) {
+                // Try to get detailed error from response
+                let errorMsg = `Status: ${fallbackResponse.status}`;
+                try {
+                  const errorData = await fallbackResponse.json();
+                  errorMsg = errorData.message || errorData.error || errorMsg;
+                } catch (e) {
+                  // If we can't parse JSON, try text
+                  try {
+                    errorMsg = await fallbackResponse.text();
+                  } catch (e2) {
+                    // If all else fails, use status code
+                    errorMsg = `Status: ${fallbackResponse.status}`;
+                  }
+                }
+                
+                throw new Error(`Both endpoints failed. ${errorMsg}`);
+              }
+              
+              // Process the fallback response
+              const fallbackData = await fallbackResponse.json();
+              const botReply = fallbackData.choices &&
+                            fallbackData.choices[0] &&
+                            fallbackData.choices[0].message &&
+                            fallbackData.choices[0].message.content;
+
+              if (botReply) {
+                const trimmedReply = botReply.trim() + "\n\n*Note: This response was generated using the fallback API endpoint.*";
+                
+                // Create response metadata
+                let reasoningInfo = REASONING_METHOD.toUpperCase();
+                if (REASONING_METHOD === "cod") {
+                  reasoningInfo += `-${COD_WORD_LIMIT}`;
+                }
+                
+                // Add enhanced reasoning info if used
+                if (ENHANCED_REASONING_ENABLED && 
+                    REASONING_ENHANCEMENT === "adaptive" && 
+                    PROBLEM_COMPLEXITY.complexity === "complex") {
+                  reasoningInfo += "-ENHANCED";
+                }
+                
+                // Process bot message to separate thinking and answer parts
+                const processed = processBotMessage(trimmedReply, REASONING_METHOD);
+                
+                thread.messages[placeholderIndex] = {
+                  content: trimmedReply,
+                  sender: "bot",
+                  isPlaceholder: false,
+                  timestamp: new Date(),
+                  wordCount: (processed.thinkingWordCount || 0) + (processed.answerWordCount || 0),
+                  reasoningMethod: reasoningInfo,
+                  thinking: processed.thinking,
+                  answer: processed.answer,
+                  thinkingWordCount: processed.thinkingWordCount || 0,
+                  answerWordCount: processed.answerWordCount || 0
+                };
+                renderCurrentThreadMessages();
+                
+                // Re-enable streaming for next message
+                ENABLE_STREAMING = true;
+                
+                return;
+              } else {
+                throw new Error("No valid response from fallback endpoint");
+              }
+            } catch (fallbackError) {
+              // Both edge function and fallback failed
+              if (fallbackError.name === 'AbortError') {
+                throw new Error("The fallback API also timed out. Try reducing max_tokens or using a simpler query.");
+              } else {
+                throw fallbackError;
+              }
             }
           }
         }
@@ -4390,6 +4552,8 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           errorMessage = "Both primary and fallback API endpoints failed. Please try again later with reduced max_tokens.";
         } else if (error.message.includes("max_tokens")) {
           errorMessage = "The API requires max_tokens to be between 1 and 8192. Please adjust your settings.";
+        } else if (error.message.includes("stream")) {
+          errorMessage = "Error with streaming mode. Trying again may help, or disable streaming in the code.";
         }
         
         thread.messages[placeholderIndex] = {
@@ -4406,6 +4570,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         };
         
         renderCurrentThreadMessages();
+        
+        // Re-enable streaming for next message
+        ENABLE_STREAMING = true;
       }
     }
 
@@ -5303,6 +5470,12 @@ Separate your steps with periods. Write your final answer after the #### separat
             SELF_REFLECTION_ENABLED = oldSetting === "true";
           }
         }
+        
+        // Load streaming preference
+        const savedStreamingPref = localStorage.getItem('streamingEnabled');
+        if (savedStreamingPref !== null) {
+          ENABLE_STREAMING = savedStreamingPref === 'true';
+        }
       } catch (err) {
         console.error("Error loading settings:", err);
       }
@@ -5436,6 +5609,9 @@ Separate your steps with periods. Write your final answer after the #### separat
         // Initialize Perplexity button
         initWebSearch();
         console.log("Web search toggle initialized");
+        
+        // Initialize streaming toggle in settings
+        setTimeout(addStreamingToggleToSettings, 1000);
         
         // Initialize the rest of the application
         await init();
@@ -5939,6 +6115,40 @@ Separate your steps with periods. Write your final answer after the #### separat
         console.log("Web search button event listener initialized successfully");
       } catch (error) {
         console.error("Error setting up web search button:", error);
+      }
+    }
+
+    // Add streaming toggle to settings page
+    function addStreamingToggleToSettings() {
+      // Find a good place to add the toggle - after web search toggle would be ideal
+      const parametersTab = document.getElementById('parametersTab');
+      if (!parametersTab) return;
+      
+      // Create streaming toggle section
+      const streamingToggleSection = document.createElement('div');
+      streamingToggleSection.className = 'web-search-toggle';
+      streamingToggleSection.innerHTML = `
+        <label class="toggle-label">
+          <input type="checkbox" id="streamingToggle" ${ENABLE_STREAMING ? 'checked' : ''}>
+          <span class="toggle-text">Enable Streaming Responses</span>
+        </label>
+      `;
+      
+      // Find where to insert it
+      const insertBeforeElement = document.querySelector('#parametersTab label[for="temp"]');
+      
+      if (insertBeforeElement) {
+        parametersTab.insertBefore(streamingToggleSection, insertBeforeElement);
+        
+        // Add event listener to the checkbox
+        const streamingToggle = document.getElementById('streamingToggle');
+        if (streamingToggle) {
+          streamingToggle.addEventListener('change', () => {
+            ENABLE_STREAMING = streamingToggle.checked;
+            localStorage.setItem('streamingEnabled', ENABLE_STREAMING.toString());
+            showNotification(`Streaming mode ${ENABLE_STREAMING ? 'enabled' : 'disabled'}`);
+          });
+        }
       }
     }
   </script>

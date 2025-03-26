@@ -3752,14 +3752,30 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
             // Use the appropriate CoD prompt based on word limit
             if (COD_WORD_LIMIT === 5) {
               systemPrompt = ENHANCED_PROMPTS.cod5;
+              // Ensure self-reflection is always respected regardless of enhanced reasoning
+              if (!SELF_REFLECTION_ENABLED) {
+                systemPrompt = systemPrompt.replace(/Before providing your final answer, add a reflection step.*?errors\.(\r?\n|\r)/g, '');
+              }
             } else if (COD_WORD_LIMIT === 10) {
               systemPrompt = ENHANCED_PROMPTS.cod10;
+              if (!SELF_REFLECTION_ENABLED) {
+                systemPrompt = systemPrompt.replace(/Before providing your final answer, add a reflection step.*?errors\.(\r?\n|\r)/g, '');
+              }
             } else if (COD_WORD_LIMIT === 15) {
               systemPrompt = ENHANCED_PROMPTS.cod15;
+              if (!SELF_REFLECTION_ENABLED) {
+                systemPrompt = systemPrompt.replace(/Before providing your final answer, add a reflection step.*?errors\.(\r?\n|\r)/g, '');
+              }
             } else if (COD_WORD_LIMIT === 17) {
               systemPrompt = ENHANCED_PROMPTS.cod17;
+              if (!SELF_REFLECTION_ENABLED) {
+                systemPrompt = systemPrompt.replace(/Before providing your final answer, add a reflection step.*?errors\.(\r?\n|\r)/g, '');
+              }
             } else if (COD_WORD_LIMIT === 20) {
               systemPrompt = ENHANCED_PROMPTS.cod20;
+              if (!SELF_REFLECTION_ENABLED) {
+                systemPrompt = systemPrompt.replace(/Before providing your final answer, add a reflection step.*?errors\.(\r?\n|\r)/g, '');
+              }
             } else {
               // Fallback to standard prompt but update word limit
               systemPrompt = PROMPTS[REASONING_METHOD].replace(/\(\d+ words maximum per step\)/, `(${COD_WORD_LIMIT} words maximum per step)`);
@@ -3773,6 +3789,26 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           if (REASONING_METHOD === "cod") {
             // First update the word limit
             systemPrompt = systemPrompt.replace(/\(\d+ words maximum per step\)/, `(${COD_WORD_LIMIT} words maximum per step)`);
+            
+            // If self-reflection is enabled but not in the prompt, add it
+            if (SELF_REFLECTION_ENABLED && !systemPrompt.includes("add a reflection step")) {
+              const reflectionInstruction = "\n\nBefore providing your final answer, add a reflection step starting with \"Reflection:\" to verify your work and catch any potential errors.";
+              // Find a good place to insert - after the first paragraph but before examples
+              const firstParagraphEnd = systemPrompt.indexOf("\n\n");
+              if (firstParagraphEnd !== -1) {
+                const examplesStart = systemPrompt.indexOf("Examples:");
+                if (examplesStart !== -1 && examplesStart > firstParagraphEnd) {
+                  // Insert before examples
+                  systemPrompt = systemPrompt.substring(0, examplesStart) + reflectionInstruction + "\n\n" + systemPrompt.substring(examplesStart);
+                } else {
+                  // Insert after first paragraph
+                  systemPrompt = systemPrompt.substring(0, firstParagraphEnd + 2) + reflectionInstruction + systemPrompt.substring(firstParagraphEnd + 2);
+                }
+              } else {
+                // Just append at the end
+                systemPrompt += reflectionInstruction;
+              }
+            }
             
             // If this is a problem that needs many steps, add instructions to use more steps
             if (PROBLEM_COMPLEXITY.estimatedSteps > 5) {
@@ -3793,6 +3829,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         let reasoningInfo = `${REASONING_METHOD.toUpperCase()}`;
         if (REASONING_METHOD === "cod") {
           reasoningInfo += `-${COD_WORD_LIMIT}`;
+          if (SELF_REFLECTION_ENABLED) {
+            reasoningInfo += " with self-reflection";
+          }
         }
         
         if (shouldUseEnhancedPrompt) {
@@ -4496,16 +4535,21 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
       const basePrompt = `Think step by step, but produce only minimal notes for each step (${COD_WORD_LIMIT} words maximum per step). Use mathematical notation where possible. Keep only essential information needed to solve the problem. Focus on key calculations and intermediate results without narrative explanation.
   
 Separate your steps with periods. Write your final answer after the #### separator.`;
+
+      // Add self-reflection instruction if enabled, regardless of enhanced reasoning settings
+      const basePromptWithReflection = SELF_REFLECTION_ENABLED ? 
+        basePrompt + `\n\nBefore providing your final answer, add a reflection step starting with "Reflection:" to verify your work and catch any potential errors.` : 
+        basePrompt;
       
       // Keep the examples part of the prompt
       const examplesStart = PROMPTS.cod.indexOf('Examples:');
       if (examplesStart !== -1) {
-        PROMPTS.cod = basePrompt + '\n\n' + PROMPTS.cod.substring(examplesStart);
+        PROMPTS.cod = basePromptWithReflection + '\n\n' + PROMPTS.cod.substring(examplesStart);
       } else {
-        PROMPTS.cod = basePrompt;
+        PROMPTS.cod = basePromptWithReflection;
       }
       
-      console.log(`Updated CoD prompt with word limit: ${COD_WORD_LIMIT}`);
+      console.log(`Updated CoD prompt with word limit: ${COD_WORD_LIMIT}, self-reflection: ${SELF_REFLECTION_ENABLED}`);
     }
     
     // Setup Enhanced Reasoning options
@@ -4585,6 +4629,16 @@ Separate your steps with periods. Write your final answer after the #### separat
           }
         });
       });
+      
+      // Also update CoD prompt when self-reflection setting changes
+      const selfReflectionToggle = document.getElementById('selfReflectionToggle');
+      if (selfReflectionToggle) {
+        selfReflectionToggle.addEventListener('change', () => {
+          if (REASONING_METHOD === 'cod') {
+            updateCoDPrompt();
+          }
+        });
+      }
     }
     
     // Settings slider handling
@@ -4776,15 +4830,15 @@ Separate your steps with periods. Write your final answer after the #### separat
         }
         
         // Save self-reflection settings
-      try {
-        const selfReflectionToggle = document.getElementById('selfReflectionToggle');
-      if (selfReflectionToggle) {
-        SELF_REFLECTION_ENABLED = selfReflectionToggle.checked;
-        console.log("Self-reflection enabled:", SELF_REFLECTION_ENABLED);
-      }
-      } catch (selfErr) {
-        console.error("Error getting self-reflection settings:", selfErr);
-      }
+        try {
+          const selfReflectionToggle = document.getElementById('selfReflectionToggle');
+          if (selfReflectionToggle) {
+            SELF_REFLECTION_ENABLED = selfReflectionToggle.checked;
+            console.log("Self-reflection enabled:", SELF_REFLECTION_ENABLED);
+          }
+        } catch (selfErr) {
+          console.error("Error getting self-reflection settings:", selfErr);
+        }
         
         // Save generation parameters safely with validation
         try {
@@ -4841,7 +4895,7 @@ Separate your steps with periods. Write your final answer after the #### separat
             localStorage.setItem("temperature", TEMPERATURE.toString());
             localStorage.setItem("topP", TOP_P.toString());
             localStorage.setItem("maxTokens", MAX_TOKENS.toString());
-            localStorage.setItem("selfConsistencyEnabled", SELF_CONSISTENCY_ENABLED.toString());
+            localStorage.setItem("selfReflectionEnabled", SELF_REFLECTION_ENABLED.toString());
             
             // Save custom prompts
             localStorage.setItem("customPrompts", JSON.stringify(PROMPTS));
@@ -5011,11 +5065,11 @@ Separate your steps with periods. Write your final answer after the #### separat
         if (selfReflectionEnabled !== null) {
           SELF_REFLECTION_ENABLED = selfReflectionEnabled === "true";
         } else {
-        // Check old setting key for compatibility
-        const oldSetting = localStorage.getItem("selfConsistencyEnabled");
-        if (oldSetting !== null) {
-          SELF_REFLECTION_ENABLED = oldSetting === "true";
-        }
+          // Check old setting key for compatibility
+          const oldSetting = localStorage.getItem("selfConsistencyEnabled");
+          if (oldSetting !== null) {
+            SELF_REFLECTION_ENABLED = oldSetting === "true";
+          }
         }
       } catch (err) {
         console.error("Error loading settings:", err);

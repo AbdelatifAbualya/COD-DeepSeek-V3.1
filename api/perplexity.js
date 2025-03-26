@@ -1,8 +1,13 @@
-// api/perplexity.js
+// api/perplexity.js - Fixed version
 
 import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
+  // Add header to prevent CORS issues
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
   // Handle CORS for preflight requests
   if (req.method === 'OPTIONS') {
     res.status(200).end();

@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "description": "LLM Playground for comparing Chain of Thought and Chain of Draft reasoning using DeepSeek V3",
   "dependencies": {
-    "node-fetch": "^2.6.7",
+    "@ai-sdk/perplexity": "^1.1.1",
+    "abort-controller": "^3.0.0",
+    "ai": "^4.2.5",
     "buffer": "^6.0.3",
-    "abort-controller": "^3.0.0"
+    "node-fetch": "^2.6.7"
   }
 }

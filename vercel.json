@@ -1,32 +1,27 @@
 {
-  "version": 2,
-  "buildCommand": null,
-  "routes": [
-    {
-      "src": "/api/perplexity",
-      "dest": "/api/perplexity.js"
-    },
-    {
-      "src": "/api/proxy",
-      "dest": "/api/proxy.js"
-    },
-    {
-      "src": "/api/streaming",
-      "dest": "/api/streaming-proxy.js"
-    },
-    {
-      "src": "/api-fallback/proxy",
-      "dest": "/api/fallback-proxy.js"
-    }
-  ],
-  "functions": {
-    "api/*.js": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
+  "name": "llm-playground-cot-cod",
+  "version": "1.0.0",
+  "description": "LLM Reasoning Interface with Chain of Thought vs Chain of Draft comparison",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test-perplexity": "node test-perplexity.js"
   },
-  "env": {
-    "PERPLEXITY_API_KEY": "@perplexity-api-key",
-    "FIREWORKS_API_KEY": "@fireworks-api-key"
+  "keywords": [
+    "llm",
+    "reasoning",
+    "cot",
+    "cod",
+    "chain-of-thought",
+    "chain-of-draft"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ai-sdk/perplexity": "^1.1.1",
+    "abort-controller": "^3.0.0",
+    "ai": "^2.2.35",
+    "buffer": "^6.0.3",
+    "node-fetch": "^2.7.0"
   }
 }

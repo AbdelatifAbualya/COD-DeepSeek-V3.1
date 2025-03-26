@@ -2344,12 +2344,15 @@
     <div id="modelTab" class="tab-content" style="display: none;">
       <div class="settings-section-header">Model Selection</div>
 
-      <label for="modelSelect">Select DeepSeek Model</label>
+      <label for="modelSelect">Select AI Model</label>
       <div class="model-select-container">
         <select id="modelSelect" class="model-dropdown">
           <option value="" disabled selected>Choose a model...</option>
-          <option value="deepseek-chat">DeepSeek Chat V3</option>
-          <option value="deepseek-reasoner">DeepSeek R1 (Reasoner)</option>
+          <option value="accounts/fireworks/models/deepseek-v3-0324">DeepSeek V3</option>
+          <option value="accounts/fireworks/models/qwen2p5-coder-32b-instruct">Qwen2.5 Coder 32B</option>
+          <option value="accounts/fireworks/models/llama-v3p3-70b-instruct">Llama 3.3 70B</option>
+          <option value="accounts/fireworks/models/mixtral-8x22b-instruct">Mixtral 8x22B</option>
+          <option value="accounts/fireworks/models/mistral-small-24b-instruct-2501">Mistral Small 24B</option>
         </select>
         <div class="dropdown-arrow">▼</div>
       </div>
@@ -4160,7 +4163,7 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         if (error.name === "AbortError") {
           errorMessage = "Request timed out. Try again with a shorter question or reduce max_tokens in settings.";
         } else if (error.message.includes("401")) {
-          errorMessage = "Authentication failed. Please check if your DeepSeek API key is properly set in Netlify environment variables.";
+          errorMessage = "Authentication failed. Please check if your FIREWORKS_API_KEY is properly set in Netlify environment variables.";
         } else if (error.message.includes("429")) {
           errorMessage = "Rate limit exceeded. Please wait a moment before trying again.";
         } else if (error.message.includes("500")) {
@@ -4349,15 +4352,30 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
       
       // Model information database
       const modelInfo = {
-        "deepseek-chat": {
-          name: "DeepSeek Chat V3",
-          tags: ["Latest", "Versatile", "Chat"],
-          description: "DeepSeek's latest chat model with strong performance across a wide range of tasks."
+        "accounts/fireworks/models/deepseek-v3-0324": {
+          name: "DeepSeek V3",
+          tags: ["Latest", "Versatile", "Advanced"],
+          description: "DeepSeek's latest model with strong all-around capabilities and reasoning."
         },
-        "deepseek-reasoner": {
-          name: "DeepSeek R1 (Reasoner)",
-          tags: ["Latest", "Reasoning", "Advanced"],
-          description: "DeepSeek's specialized reasoning model (R1) with enhanced logical and mathematical capabilities."
+        "accounts/fireworks/models/qwen2p5-coder-32b-instruct": {
+          name: "Qwen2.5 Coder 32B",
+          tags: ["Coding", "Technical", "Efficient"],
+          description: "Specialized model for programming and technical tasks with excellent code generation."
+        },
+        "accounts/fireworks/models/llama-v3p3-70b-instruct": {
+          name: "Llama 3.3 70B",
+          tags: ["Powerful", "Latest", "Versatile"],
+          description: "Latest Llama model with enhanced reasoning and broad capabilities."
+        },
+        "accounts/fireworks/models/mixtral-8x22b-instruct": {
+          name: "Mixtral 8x22B",
+          tags: ["MoE", "Advanced", "Powerful"],
+          description: "Mixture of Experts model with excellent reasoning and knowledge capabilities."
+        },
+        "accounts/fireworks/models/mistral-small-24b-instruct-2501": {
+          name: "Mistral Small 24B",
+          tags: ["Efficient", "Balanced", "Versatile"],
+          description: "Balanced model offering good performance across a wide range of tasks."
         }
       };
       
@@ -4382,9 +4400,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         modelSelect.value = MODEL_NAME;
         updateModelInfo(MODEL_NAME);
       } else {
-        // Set default to DeepSeek Chat if no model is selected
-        MODEL_NAME = "deepseek-chat";
-        MODEL_NAME_DISPLAY = "DeepSeek Chat V3";
+        // Set default to Llama 3.3 70B if no model is selected
+        MODEL_NAME = "accounts/fireworks/models/llama-v3p3-70b-instruct";
+        MODEL_NAME_DISPLAY = "Llama 3.3 70B";
         modelSelect.value = MODEL_NAME;
         updateModelInfo(MODEL_NAME);
       }

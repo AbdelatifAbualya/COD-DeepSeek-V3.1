@@ -2407,6 +2407,39 @@
       background-color: #5686f5;
       color: white;
     }
+    
+    /* Add this to your CSS styles */
+    @keyframes typingAnimation {
+      0% { border-right-color: rgba(86, 134, 245, 0.7); }
+      100% { border-right-color: transparent; }
+    }
+
+    .message.bot.streaming {
+      border-right: 3px solid rgba(86, 134, 245, 0.7);
+      animation: typingAnimation 0.8s infinite ease;
+    }
+
+    .streaming-indicator {
+      display: inline-block;
+      background-color: rgba(86, 134, 245, 0.2);
+      color: var(--accent-primary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      margin-top: 8px;
+    }
+
+    .streaming-indicator::after {
+      content: "...";
+      animation: ellipsisAnimation 1.5s infinite;
+    }
+
+    @keyframes ellipsisAnimation {
+      0% { content: "."; }
+      33% { content: ".."; }
+      66% { content: "..."; }
+      100% { content: "."; }
+    }
   </style>
   
   <script>
@@ -3689,8 +3722,14 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         thread.messages.forEach(msg => {
           const messageDiv = document.createElement("div");
           messageDiv.classList.add("message", msg.sender);
+          
           if (msg.isPlaceholder) {
             messageDiv.classList.add("placeholder");
+          }
+          
+          // Add streaming class for visual indication
+          if (msg.isStreaming) {
+            messageDiv.classList.add("streaming");
           }
 
           const timestampStr = msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -3706,8 +3745,20 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
             const messageContainer = document.createElement("div");
             messageContainer.className = "message-container";
             
+            // If this is a streaming message, don't try to parse thinking/answer yet
+            if (msg.isStreaming) {
+              const contentEl = document.createElement("div");
+              contentEl.innerHTML = transformMessage(msg.content);
+              messageContainer.appendChild(contentEl);
+              
+              // Add streaming indicator
+              const streamingIndicator = document.createElement("div");
+              streamingIndicator.className = "streaming-indicator";
+              streamingIndicator.textContent = "Streaming";
+              messageContainer.appendChild(streamingIndicator);
+            } 
             // If we have thinking steps (for CoT or CoD)
-            if (msg.thinking) {
+            else if (msg.thinking) {
               const thinkingDiv = document.createElement("div");
               thinkingDiv.className = "thinking-steps";
               
@@ -3733,8 +3784,8 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
               messageContainer.appendChild(thinkingDiv);
             }
             
-            // If we have an answer (for CoD, CoT or Standard)
-            if (msg.answer) {
+            // If we have an answer (for CoD, CoT or Standard) and not streaming
+            if (msg.answer && !msg.isStreaming) {
               const answerDiv = document.createElement("div");
               answerDiv.className = "final-answer";
               
@@ -3751,8 +3802,8 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
               messageContainer.appendChild(answerDiv);
             }
             
-            // If we have neither thinking nor answer (fall back to content)
-            if (!msg.thinking && !msg.answer) {
+            // If we have neither thinking nor answer and not streaming (fall back to content)
+            if (!msg.thinking && !msg.answer && !msg.isStreaming) {
               const contentEl = document.createElement("div");
               contentEl.innerHTML = transformMessage(msg.content);
               messageContainer.appendChild(contentEl);
@@ -3805,8 +3856,22 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
               wordCountBadge.appendChild(webSearchIndicator);
             }
             
+            // If streaming, show status instead of token count
+            if (msg.isStreaming) {
+              const streamingIndicator = document.createElement("div");
+              streamingIndicator.className = "web-search-indicator";
+              streamingIndicator.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                Live streaming
+              `;
+              wordCountBadge.innerHTML = "";
+              wordCountBadge.appendChild(streamingIndicator);
+            }
+            
             // If this is a CoD message, add token savings estimate
-            if (msg.reasoningMethod && msg.reasoningMethod.startsWith("COD") && thread.messages.length > 1) {
+            if (!msg.isStreaming && msg.reasoningMethod && msg.reasoningMethod.startsWith("COD") && thread.messages.length > 1) {
               // Find a similar CoT message (if available) to compare token savings
               const cotMessages = thread.messages.filter(m => 
                 m.sender === "bot" && 
@@ -3837,6 +3902,8 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         });
         chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
       }
+      
+      // Add copy buttons to code blocks
       addCodeCopyButtons();
     }
 

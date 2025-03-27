@@ -1,6 +1,6 @@
-// Vercel Edge Function for RAG using MongoDB and Fireworks.ai
-import { MongoClient } from 'mongodb';
-import fetch from 'node-fetch';
+// Vercel Serverless Function for RAG using MongoDB and Fireworks.ai
+const { MongoClient } = require('mongodb');
+const fetch = require('node-fetch');
 
 // Cache MongoDB connection
 let cachedDb = null;
@@ -22,36 +22,27 @@ async function connectToDatabase(uri) {
   return db;
 }
 
-export default async function handler(request, context) {
+module.exports = async (req, res) => {
   // Log function invocation to help with debugging
   console.log("RAG API endpoint called:", new Date().toISOString());
   
   // Handle CORS for preflight requests
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Max-Age': '86400'
-      }
-    });
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.status(204).end();
+    return;
   }
 
   // Only allow POST requests
-  if (request.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method Not Allowed' }),
-      {
-        status: 405,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Allow': 'POST'
-        }
-      }
-    );
+  if (req.method !== 'POST') {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Allow', 'POST');
+    res.status(405).json({ error: 'Method Not Allowed' });
+    return;
   }
 
   try {
@@ -61,60 +52,43 @@ export default async function handler(request, context) {
     
     if (!fireworksApiKey || !mongoDbUri) {
       console.error("Missing required environment variables");
-      return new Response(
-        JSON.stringify({
-          error: 'Configuration error',
-          message: 'Please set FIREWORKS_API_KEY and MONGODB_URI in your Vercel environment variables'
-        }),
-        {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
-        }
-      );
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.status(500).json({
+        error: 'Configuration error',
+        message: 'Please set FIREWORKS_API_KEY and MONGODB_URI in your Vercel environment variables'
+      });
+      return;
     }
 
-    // Parse request body
+    // Parse request body - handle different request body formats
     let requestBody;
     try {
-      requestBody = await request.json();
+      // For Vercel Serverless Functions (Node.js), req.body is already parsed
+      requestBody = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     } catch (parseError) {
       console.error("Failed to parse request body:", parseError);
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid JSON in request body',
-          message: parseError.message
-        }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
-        }
-      );
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.status(400).json({
+        error: 'Invalid JSON in request body',
+        message: parseError.message
+      });
+      return;
     }
 
     // Get query from request
     const { query, collectionName, modelName } = requestBody;
     
     if (!query) {
-      return new Response(
-        JSON.stringify({ error: 'Missing query parameter' }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
-        }
-      );
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.status(400).json({ error: 'Missing query parameter' });
+      return;
     }
     
     // Set default collection name if not provided
-    const collection = collectionName || process.env.MONGODB_COLLECTION || "documents";
+    const collection = collectionName || process.env.MONGODB_COLLECTION || "rag_collection";
     // Set default model name if not provided
     const model = modelName || "nomic-ai/nomic-embed-text-v1.5";
 
@@ -212,40 +186,26 @@ ${context}`
     const answer = llmData.choices[0].message.content;
 
     // Step 6: Return response with answer and sources
-    return new Response(
-      JSON.stringify({
-        answer: answer,
-        sources: queryResult.map(doc => ({
-          instruction: doc.instruction,
-          response: doc.response.substring(0, 200) + (doc.response.length > 200 ? '...' : ''),
-          context: doc.context,
-          score: doc.score
-        }))
-      }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        }
-      }
-    );
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.status(200).json({
+      answer: answer,
+      sources: queryResult.map(doc => ({
+        instruction: doc.instruction,
+        response: doc.response.substring(0, 200) + (doc.response.length > 200 ? '...' : ''),
+        context: doc.context,
+        score: doc.score
+      }))
+    });
 
   } catch (error) {
     console.error('Function error:', error.message, error.stack);
-    return new Response(
-      JSON.stringify({ 
-        error: 'Internal Server Error', 
-        message: error.message
-      }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
-      }
-    );
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.status(500).json({ 
+      error: 'Internal Server Error', 
+      message: error.message
+    });
   }
 }

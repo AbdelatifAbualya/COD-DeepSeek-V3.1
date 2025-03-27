@@ -2592,9 +2592,16 @@
               </svg>
             </label>
             <button id="webSearchBtn" class="action-button" type="button" title="Toggle web search">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M11 19C15.4183 19 19 15.4183 19 11C19 6.58172 15.4183 3 11 3C6.58172 3 3 6.58172 3 11C3 15.4183 6.58172 19 11 19Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M21 21L16.65 16.65" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </button>
+            <button id="ragBtn" class="action-button" type="button" title="Toggle MongoDB RAG">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <polyline points="12 22.08 12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline>
               </svg>
             </button>
           </div>
@@ -4266,6 +4273,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
       // Check if Perplexity is enabled
       const usePerplexity = localStorage.getItem('usePerplexity') === 'true';
       
+      // Check if RAG is enabled
+      const useRag = localStorage.getItem('ragEnabled') === 'true';
+      
       // Analyze problem complexity if enhanced reasoning is enabled
       if (ENHANCED_REASONING_ENABLED && REASONING_ENHANCEMENT === "adaptive") {
         analyzeProblemComplexity(message);
@@ -4323,9 +4333,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         attachedFilesContainer.style.display = 'none';
       }
       
-      // If we're not using Perplexity, make sure we have a model selected
-      if (!usePerplexity && !MODEL_NAME) {
-        const errorMsg = "Error: Please select a model in the Settings or enable Perplexity.";
+      // If we're not using Perplexity or RAG, make sure we have a model selected
+      if (!usePerplexity && !useRag && !MODEL_NAME) {
+        const errorMsg = "Error: Please select a model in the Settings or enable Perplexity/RAG.";
         addMessageToCurrentThread(errorMsg, "bot");
         console.error(errorMsg);
         return;
@@ -4335,12 +4345,79 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
       const wordCountRequest = parseWordCountRequest(message);
       
       // Add placeholder message showing we're thinking
-      let placeholderText = usePerplexity ? "Searching the web with Perplexity..." : "Bot is thinking...";
+      let placeholderText = usePerplexity ? "Searching the web with Perplexity..." : 
+                           useRag ? "Searching knowledge base with RAG..." : 
+                           "Bot is thinking...";
       addMessageToCurrentThread(placeholderText, "bot", true);
       const thread = threads.find(t => t.id === currentThreadId);
       const placeholderIndex = thread.messages.length - 1;
 
       try {
+        // If RAG is enabled, try it first
+        if (useRag) {
+          const collectionName = localStorage.getItem('ragCollectionName') || '';
+          
+          try {
+            // Add timestamp to URL to prevent caching
+            const timestamp = new Date().getTime();
+            const cacheBuster = `?t=${timestamp}`;
+            
+            // Call the RAG API
+            const response = await fetch(`/api/rag${cacheBuster}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                query: message,
+                collectionName: collectionName
+              })
+            });
+            
+            if (!response.ok) {
+              throw new Error(`RAG API error: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            
+            // Format sources if available
+            let formattedAnswer = data.answer;
+            
+            if (data.sources && data.sources.length > 0) {
+              formattedAnswer += "\n\n**Sources:**\n";
+              data.sources.forEach((source, index) => {
+                formattedAnswer += `${index + 1}. ${source.text}\n`;
+              });
+            }
+            
+            // Update the message in the thread
+            thread.messages[placeholderIndex] = {
+              content: formattedAnswer,
+              sender: "bot",
+              isPlaceholder: false,
+              timestamp: new Date(),
+              wordCount: countWords(formattedAnswer),
+              reasoningMethod: "RAG-ENHANCED",
+              thinking: null,
+              answer: formattedAnswer,
+              thinkingWordCount: 0,
+              answerWordCount: countWords(formattedAnswer)
+            };
+            
+            renderCurrentThreadMessages();
+            return; // Early return since we've handled the message
+          } catch (ragError) {
+            console.error("RAG error:", ragError);
+            // If RAG fails, continue with regular processing
+            // Update placeholder message
+            thread.messages[placeholderIndex].content = "RAG search failed, using standard model...";
+            renderCurrentThreadMessages();
+          }
+        }
+
+        // Continue with existing Perplexity and regular API calls...
+        // ... rest of the existing sendMessage function ...
+
         // If Perplexity is enabled, use it instead of the regular model
         if (usePerplexity) {
           console.log("Using Perplexity for this query");
@@ -5812,6 +5889,7 @@ Separate your steps with periods. Write your final answer after the #### separat
         const textarea = document.getElementById('userInput');
         const sendBtn = document.getElementById('sendBtn');
         const webSearchBtn = document.getElementById('webSearchBtn');
+        const ragBtn = document.getElementById('ragBtn');
         
         if (textarea) {
           textarea.style.height = '24px';
@@ -5859,12 +5937,20 @@ Separate your steps with periods. Write your final answer after the #### separat
           }
         }
         
+        // Initialize RAG button
+        if (ragBtn) {
+          initRagButton();
+        }
+        
         // Initialize Perplexity button
         initWebSearch();
         console.log("Web search toggle initialized");
         
         // Initialize streaming toggle in settings
         setTimeout(addStreamingToggleToSettings, 1000);
+        
+        // Initialize RAG functionality
+        setTimeout(initRagFunctionality, 1000);
         
         // Initialize the rest of the application
         await init();
@@ -6434,6 +6520,135 @@ Separate your steps with periods. Write your final answer after the #### separat
             localStorage.setItem('streamingEnabled', ENABLE_STREAMING.toString());
             showNotification(`Streaming mode ${ENABLE_STREAMING ? 'enabled' : 'disabled'}`);
           });
+        }
+      }
+    }
+
+    /***********************
+     * RAG Functionality
+     ***********************/
+    function initRagFunctionality() {
+      // Add RAG toggle to settings modal
+      const parametersTab = document.getElementById('parametersTab');
+      if (!parametersTab) return;
+      
+      // Create RAG toggle section
+      const ragToggleSection = document.createElement('div');
+      ragToggleSection.className = 'web-search-toggle';
+      ragToggleSection.innerHTML = `
+        <label class="toggle-label">
+          <input type="checkbox" id="ragToggle">
+          <span class="toggle-text">Enable MongoDB RAG</span>
+        </label>
+        <div id="ragOptions" style="margin-top: 10px; display: none;">
+          <input type="text" id="collectionName" placeholder="Collection name (optional)" 
+                 style="width: 100%; padding: 8px; margin-bottom: 8px; background: var(--bg-component); color: var(--text-primary); border: 1px solid var(--border-medium); border-radius: var(--radius-sm);">
+        </div>
+      `;
+      
+      // Find where to insert it - after streaming toggle
+      const streamingToggle = document.querySelector('.web-search-toggle');
+      if (streamingToggle) {
+        parametersTab.insertBefore(ragToggleSection, streamingToggle.nextSibling);
+      } else {
+        // If streaming toggle not found, insert before temperature slider
+        const insertBeforeElement = document.querySelector('#parametersTab label[for="temp"]');
+        if (insertBeforeElement) {
+          parametersTab.insertBefore(ragToggleSection, insertBeforeElement);
+        }
+      }
+      
+      // Add event listener to the checkbox
+      const ragToggle = document.getElementById('ragToggle');
+      const ragOptions = document.getElementById('ragOptions');
+      
+      if (ragToggle && ragOptions) {
+        // Load saved preference from main toggle button
+        const ragEnabled = localStorage.getItem('ragEnabled') === 'true';
+        ragToggle.checked = ragEnabled;
+        ragOptions.style.display = ragEnabled ? 'block' : 'none';
+        
+        // Load saved collection name
+        const savedCollection = localStorage.getItem('ragCollectionName');
+        if (savedCollection && document.getElementById('collectionName')) {
+          document.getElementById('collectionName').value = savedCollection;
+        }
+        
+        // Toggle RAG options visibility and sync with main button
+        ragToggle.addEventListener('change', () => {
+          const isEnabled = ragToggle.checked;
+          ragOptions.style.display = isEnabled ? 'block' : 'none';
+          localStorage.setItem('ragEnabled', isEnabled.toString());
+          
+          // Sync with main RAG button
+          enableRag = isEnabled;
+          const ragBtn = document.getElementById('ragBtn');
+          if (ragBtn) {
+            if (isEnabled) {
+              ragBtn.style.backgroundColor = 'var(--accent-primary)';
+              ragBtn.style.color = 'white';
+            } else {
+              ragBtn.style.backgroundColor = '';
+              ragBtn.style.color = '';
+            }
+          }
+          
+          showNotification(`MongoDB RAG ${isEnabled ? 'enabled' : 'disabled'}`);
+        });
+        
+        // Save collection name when it changes
+        const collectionNameInput = document.getElementById('collectionName');
+        if (collectionNameInput) {
+          collectionNameInput.addEventListener('change', () => {
+            localStorage.setItem('ragCollectionName', collectionNameInput.value);
+          });
+        }
+      }
+    }
+
+    // Variables for RAG
+    let enableRag = false;
+    
+    // Toggle RAG function
+    function toggleRag() {
+      enableRag = !enableRag;
+      localStorage.setItem('ragEnabled', enableRag.toString());
+      
+      // Update button appearance
+      const ragBtn = document.getElementById('ragBtn');
+      if (ragBtn) {
+        if (enableRag) {
+          ragBtn.style.backgroundColor = 'var(--accent-primary)';
+          ragBtn.style.color = 'white';
+          showNotification('MongoDB RAG enabled');
+        } else {
+          ragBtn.style.backgroundColor = '';
+          ragBtn.style.color = '';
+          showNotification('MongoDB RAG disabled');
+        }
+      }
+      
+      // Sync with settings panel checkbox
+      const ragToggle = document.getElementById('ragToggle');
+      const ragOptions = document.getElementById('ragOptions');
+      if (ragToggle && ragOptions) {
+        ragToggle.checked = enableRag;
+        ragOptions.style.display = enableRag ? 'block' : 'none';
+      }
+    }
+    
+    // Initialize RAG button
+    function initRagButton() {
+      const ragBtn = document.getElementById('ragBtn');
+      if (ragBtn) {
+        ragBtn.addEventListener('click', toggleRag);
+        
+        // Load saved preference
+        const savedRag = localStorage.getItem('ragEnabled') === 'true';
+        if (savedRag) {
+          enableRag = true;
+          ragBtn.style.backgroundColor = 'var(--accent-primary)';
+          ragBtn.style.color = 'white';
         }
       }
     }

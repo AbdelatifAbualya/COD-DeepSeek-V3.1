@@ -5,12 +5,14 @@
     { "src": "api/api-proxy.js", "use": "@vercel/node" },
     { "src": "api/perplexity.js", "use": "@vercel/node" },
     { "src": "api/proxy.js", "use": "@vercel/node" },
-    { "src": "api/streaming.js", "use": "@vercel/node" }
+    { "src": "api/streaming.js", "use": "@vercel/node" },
+    { "src": "api/rag.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/api/perplexity", "dest": "/api/perplexity.js" },
     { "src": "/api/streaming", "dest": "/api/streaming.js" },
     { "src": "/api/proxy", "dest": "/api/proxy.js" },
+    { "src": "/api/rag", "dest": "/api/rag.js" },
     { "src": "/api/(.*)", "dest": "/api/api-proxy.js" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]

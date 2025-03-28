@@ -1,238 +1,168 @@
-// api/streaming-edge.js
-export const config = {
-  runtime: 'edge',
-};
+// Node.js compatible function for streaming API responses
+const fetch = require('node-fetch');
 
-export default async function handler(request) {
-  // Handle CORS for preflight requests
-  if (request.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Max-Age': '86400'
-      }
-    });
+module.exports = async (req, res) => {
+  // Log function invocation
+  console.log("Streaming API called:", new Date().toISOString());
+
+  // Handle OPTIONS request for CORS
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.status(204).end();
+    return;
   }
 
   // Only allow POST requests
-  if (request.method !== 'POST') {
-    return new Response(
-      JSON.stringify({ error: 'Method Not Allowed' }),
-      {
-        status: 405,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Allow': 'POST'
-        }
-      }
-    );
+  if (req.method !== 'POST') {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Allow', 'POST');
+    res.status(405).json({ error: 'Method Not Allowed' });
+    return;
   }
 
   try {
-    // Get API key from environment variable
+    // Get the Fireworks API key from environment variables
     const apiKey = process.env.FIREWORKS_API_KEY;
+    console.log("Environment check: FIREWORKS_API_KEY exists?", !!apiKey);
     
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({
-          error: 'API key not configured',
-          message: 'Please set FIREWORKS_API_KEY in your Vercel environment variables'
-        }),
-        {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
-        }
-      );
+      console.error("ERROR: Fireworks API key is missing in environment variables");
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.status(500).json({
+        error: 'API key not configured',
+        message: 'Please set FIREWORKS_API_KEY in your Vercel environment variables'
+      });
+      return;
     }
 
     // Parse request body
     let requestBody;
     try {
-      requestBody = await request.json();
+      requestBody = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     } catch (parseError) {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid JSON in request body',
-          message: parseError.message
-        }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
-        }
-      );
+      console.error("Failed to parse request body:", parseError);
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.status(400).json({
+        error: 'Invalid JSON in request body',
+        message: parseError.message
+      });
+      return;
+    }
+
+    // Log request information
+    const modelName = requestBody.model || 'unknown';
+    console.log('Streaming request received for model:', modelName);
+    
+    // Enable streaming if not explicitly set
+    if (requestBody.stream === undefined) {
+      requestBody.stream = true;
     }
     
-    // Make sure model is specified and stream is true
-    if (!requestBody.model) {
-      return new Response(
-        JSON.stringify({
-          error: 'Missing model parameter',
-          message: 'Model parameter is required'
-        }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*'
-          }
-        }
-      );
+    // Prepare request for Fireworks API
+    const apiEndpoint = 'https://api.fireworks.ai/inference/v1/chat/completions';
+    
+    // Validate max_tokens (Fireworks models accept different limits based on model)
+    const originalMaxTokens = requestBody.max_tokens || 4096;
+    const validatedMaxTokens = Math.min(Math.max(1, originalMaxTokens), 8192);
+    
+    if (originalMaxTokens !== validatedMaxTokens) {
+      console.log(`Adjusted max_tokens from ${originalMaxTokens} to ${validatedMaxTokens}`);
     }
     
-    // Force stream parameter to true
-    requestBody.stream = true;
-    
-    // Log request details for monitoring
-    console.log(`Streaming request: model=${requestBody.model}`);
-    
-    // Create a transform stream for processing
-    const { readable, writable } = new TransformStream();
-    const writer = writable.getWriter();
-    const encoder = new TextEncoder();
-    
-    // Start the response immediately with streaming headers
-    const response = new Response(readable, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache, no-transform',
-        'Connection': 'keep-alive',
-        'Access-Control-Allow-Origin': '*'
+    const cleanedParams = {
+      model: requestBody.model,
+      messages: requestBody.messages,
+      max_tokens: validatedMaxTokens,
+      temperature: requestBody.temperature,
+      top_p: requestBody.top_p,
+      stream: true  // Force streaming mode
+    };
+
+    // Remove undefined or null values
+    Object.keys(cleanedParams).forEach(key => {
+      if (cleanedParams[key] === undefined || cleanedParams[key] === null) {
+        delete cleanedParams[key];
       }
     });
     
-    // Process in background
-    (async () => {
-      try {
-        // Call the Fireworks API with streaming enabled
-        const fireworksResponse = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify(requestBody)
-        });
-        
-        if (!fireworksResponse.ok) {
-          // Handle API error responses
-          let errorDetails;
-          try {
-            errorDetails = await fireworksResponse.text();
-          } catch (e) {
-            errorDetails = `Status code: ${fireworksResponse.status}`;
-          }
-          
-          const errorMessage = `data: ${JSON.stringify({ 
-            error: true, 
-            message: `API Error: ${fireworksResponse.statusText}`,
-            details: errorDetails
-          })}\n\n`;
-          
-          await writer.write(encoder.encode(errorMessage));
-          await writer.close();
-          return;
-        }
-        
-        // Handle streaming response from Fireworks API
-        const reader = fireworksResponse.body.getReader();
-        const decoder = new TextDecoder();
-        
-        let incompleteChunk = '';
-        
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            
-            if (done) {
-              break;
-            }
-            
-            // Decode the chunk and combine with any incomplete data from previous iteration
-            const textChunk = incompleteChunk + decoder.decode(value, { stream: true });
-            
-            // Split by lines and process each SSE message
-            const lines = textChunk.split('\n');
-            
-            // The last line might be incomplete, save it for the next iteration
-            incompleteChunk = lines.pop() || '';
-            
-            // Process all complete lines
-            for (const line of lines) {
-              // Skip empty lines
-              if (!line.trim()) {
-                continue;
-              }
-              
-              // Forward data messages directly
-              if (line.startsWith('data:')) {
-                await writer.write(encoder.encode(line + '\n\n'));
-              } else {
-                // For non-data lines, wrap them in a proper SSE format
-                await writer.write(encoder.encode(`data: ${line}\n\n`));
-              }
-            }
-          }
-          
-          // Process any remaining incomplete chunk
-          if (incompleteChunk) {
-            await writer.write(encoder.encode(`data: ${incompleteChunk}\n\n`));
-          }
-          
-          // Signal the end of the stream
-          await writer.write(encoder.encode('data: [DONE]\n\n'));
-        } catch (streamError) {
-          console.error('Stream processing error:', streamError);
-          
-          // Communicate stream error to client
-          const errorMessage = `data: ${JSON.stringify({ 
-            error: true, 
-            message: `Stream processing error: ${streamError.message}`
-          })}\n\n`;
-          
-          await writer.write(encoder.encode(errorMessage));
-        } finally {
-          await writer.close();
-        }
-      } catch (error) {
-        console.error('Fetch error:', error);
-        
-        // Communicate fetch error to client
-        const errorMessage = `data: ${JSON.stringify({ 
-          error: true, 
-          message: `Request failed: ${error.message}`
-        })}\n\n`;
-        
-        await writer.write(encoder.encode(errorMessage));
-        await writer.close();
-      }
-    })();
+    // Set up headers for streaming response
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.flushHeaders(); // Important for streaming
     
-    return response;
+    // Set up the Fireworks API request
+    const apiRequestOptions = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(cleanedParams)
+    };
+    
+    try {
+      // Call the Fireworks API to get the streaming response
+      const response = await fetch(apiEndpoint, apiRequestOptions);
+      
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+      }
+      
+      // Get the readable stream from the response
+      const apiStream = response.body;
+      
+      // Set up event listeners for the stream
+      apiStream.on('data', (chunk) => {
+        // Send each chunk directly to the client
+        res.write(chunk);
+        // Flush to ensure streaming
+        res.flush && res.flush();
+      });
+      
+      apiStream.on('end', () => {
+        // Ensure [DONE] is sent to close the client connection
+        res.write('data: [DONE]\n\n');
+        res.end();
+      });
+      
+      apiStream.on('error', (error) => {
+        console.error('Stream error:', error);
+        res.write(`data: ${JSON.stringify({error: true, message: error.message})}\n\n`);
+        res.write('data: [DONE]\n\n');
+        res.end();
+      });
+      
+      // Handle client disconnection
+      req.on('close', () => {
+        console.log('Client closed connection');
+        apiStream.destroy();
+        res.end();
+      });
+      
+    } catch (error) {
+      console.error('API request error:', error);
+      res.write(`data: ${JSON.stringify({error: true, message: error.message})}\n\n`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+    }
   } catch (error) {
-    console.error('Handler error:', error);
+    console.error('Function error:', error.name, error.message);
     
-    return new Response(
-      JSON.stringify({ 
-        error: 'Internal Server Error', 
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.status(500).json({
+      error: error.message || 'Unknown error',
+      details: {
+        name: error.name,
         message: error.message
-      }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        }
       }
-    );
+    });
   }
-}
+};

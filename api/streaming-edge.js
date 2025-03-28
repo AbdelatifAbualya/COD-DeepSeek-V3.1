@@ -1,6 +1,8 @@
 // api/streaming-edge.js
+// This file is specifically for Vercel Edge Functions
 export const config = {
   runtime: 'edge',
+  regions: ['iad1'], // Optional: you can specify regions or use 'auto'
 };
 
 export default async function handler(request) {

@@ -96,12 +96,19 @@ export default async function handler(request, context) {
     })}`);
     
     // Validate max_tokens (Fireworks models accept different limits based on model)
-    const originalMaxTokens = requestBody.max_tokens || 4096;
-    const validatedMaxTokens = Math.min(Math.max(1, originalMaxTokens), 8192);
+    const originalMaxTokens = requestBody.max_tokens || 4008;
+    const validatedMaxTokens = Math.min(Math.max(1, originalMaxTokens), 40000);
     
     if (originalMaxTokens !== validatedMaxTokens) {
       console.log(`Adjusted max_tokens from ${originalMaxTokens} to ${validatedMaxTokens} to meet API requirements`);
     }
+    
+    // Set default parameters if not provided
+    if (requestBody.top_p === undefined) requestBody.top_p = 1;
+    if (requestBody.top_k === undefined) requestBody.top_k = 40;
+    if (requestBody.presence_penalty === undefined) requestBody.presence_penalty = 0;
+    if (requestBody.frequency_penalty === undefined) requestBody.frequency_penalty = 0;
+    if (requestBody.temperature === undefined) requestBody.temperature = 0.6;
     
     const startTime = Date.now();
     

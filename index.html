@@ -4456,6 +4456,13 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
     }
     
     async function sendMessage(message) {
+      // First get the current streaming setting from localStorage
+      // This ensures we're using the latest toggle state
+      const savedStreamingPref = localStorage.getItem('streamingEnabled');
+      ENABLE_STREAMING = savedStreamingPref !== null ? savedStreamingPref === 'true' : ENABLE_STREAMING;
+      
+      console.log(`Current streaming state: ${ENABLE_STREAMING ? 'enabled' : 'disabled'}`);
+      
       // Check if Perplexity is enabled
       const usePerplexity = localStorage.getItem('usePerplexity') === 'true';
       
@@ -5686,6 +5693,14 @@ Separate your steps with periods. Write your final answer after the #### separat
         const prevEnhanced = ENHANCED_REASONING_ENABLED;
         const prevEnhancementType = REASONING_ENHANCEMENT;
         
+        // Get streaming setting directly from the toggle in the modal
+        const streamingToggle = document.getElementById('streamingToggle');
+        if (streamingToggle) {
+          ENABLE_STREAMING = streamingToggle.checked;
+          localStorage.setItem('streamingEnabled', ENABLE_STREAMING.toString());
+          console.log(`Streaming preference saved: ${ENABLE_STREAMING}`);
+        }
+        
         // Get model from select
         try {
           const modelSelect = document.getElementById("modelSelect");
@@ -6077,6 +6092,13 @@ Separate your steps with periods. Write your final answer after the #### separat
         // Load settings first
         await loadPersistedSettings();
         console.log("Settings loaded");
+        
+        // Make sure we load streaming preference correctly
+        const savedStreamingPref = localStorage.getItem('streamingEnabled');
+        if (savedStreamingPref !== null) {
+          ENABLE_STREAMING = savedStreamingPref === 'true';
+          console.log(`Loaded streaming preference: ${ENABLE_STREAMING ? 'enabled' : 'disabled'}`);
+        }
         
         // Initialize UI components
         const textarea = document.getElementById('userInput');
@@ -6710,7 +6732,9 @@ Separate your steps with periods. Write your final answer after the #### separat
         if (streamingToggle) {
           streamingToggle.addEventListener('change', () => {
             ENABLE_STREAMING = streamingToggle.checked;
+            // Save to localStorage immediately
             localStorage.setItem('streamingEnabled', ENABLE_STREAMING.toString());
+            console.log(`Streaming preference saved: ${ENABLE_STREAMING}`);
             showNotification(`Streaming mode ${ENABLE_STREAMING ? 'enabled' : 'disabled'}`);
           });
         }

@@ -94,6 +94,17 @@ export default async function handler(request) {
     // Force stream parameter to true
     requestBody.stream = true;
     
+    // Set default parameters if not provided
+    if (requestBody.max_tokens === undefined) requestBody.max_tokens = 4008;
+    if (requestBody.top_p === undefined) requestBody.top_p = 1;
+    if (requestBody.top_k === undefined) requestBody.top_k = 40;
+    if (requestBody.presence_penalty === undefined) requestBody.presence_penalty = 0;
+    if (requestBody.frequency_penalty === undefined) requestBody.frequency_penalty = 0;
+    if (requestBody.temperature === undefined) requestBody.temperature = 0.6;
+    
+    // Validate max_tokens
+    requestBody.max_tokens = Math.min(Math.max(1, requestBody.max_tokens), 40000);
+    
     // Log request details for monitoring
     console.log(`Streaming request: model=${requestBody.model}`);
     

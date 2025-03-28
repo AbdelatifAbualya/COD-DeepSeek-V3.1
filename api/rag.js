@@ -248,10 +248,14 @@ module.exports = async (req, res) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: "accounts/fireworks/models/llama-v3p3-70b-instruct", // Use your preferred model
+          model: "accounts/fireworks/models/phi-3-vision-128k-instruct", // Updated model
           messages: messages,
-          temperature: 0.7,
-          max_tokens: 1024
+          temperature: 0.6,
+          max_tokens: 4008,
+          top_p: 1,
+          top_k: 40, 
+          presence_penalty: 0,
+          frequency_penalty: 0
         })
       });
 

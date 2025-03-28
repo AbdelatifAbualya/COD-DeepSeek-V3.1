@@ -22,6 +22,6 @@
     { "src": "/api/api-proxy", "dest": "/api/api-proxy" }
   ],
   "env": {
-    "FIREWORKS_API_KEY": "@fireworks_api_key"
+    "FIREWORKS_API_KEY": "fireworks_api_key"
   }
 }

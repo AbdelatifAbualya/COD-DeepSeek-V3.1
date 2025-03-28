@@ -4759,7 +4759,9 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
                   }
                   
                   try {
-                    const data = JSON.parse(dataText);
+                    // Ensure dataText is proper JSON before parsing
+                    const trimmedDataText = dataText.trim();
+                    const data = JSON.parse(trimmedDataText);
                     
                     // Check for completion
                     if (data.done === true) {

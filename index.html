@@ -3166,6 +3166,8 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
      * Helper: Parse Content for Export
      ************************************************/
     function parseContentForExport(content) {
+      if (!content) return []; // Handle empty content
+      
       const result = [];
       const segments = content.split(/```/);
       for (let i = 0; i < segments.length; i++) {
@@ -3178,7 +3180,7 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         } else {
           // Code block
           const codeSegment = segments[i].trim();
-          const firstNewlineIndex = codeSegment.index('\n');
+          const firstNewlineIndex = codeSegment.indexOf('\n'); // Fixed: was using index()
           let language = '';
           let codeContent = codeSegment;
           if (firstNewlineIndex !== -1) {
@@ -3419,20 +3421,25 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
      ***********************/
     function downloadCurrentThreadAsTxt() {
       const thread = threads.find(t => t.id === currentThreadId);
-      if (!thread) return;
+      if (!thread) {
+        showNotification("Error: No active thread found");
+        return;
+      }
 
-      let content = `Model: ${MODEL_NAME_DISPLAY} (${REASONING_METHOD.toUpperCase()}`;
+      let content = `Model: ${MODEL_NAME_DISPLAY || "Unknown"} (${REASONING_METHOD.toUpperCase()}`;
       if (REASONING_METHOD === "cod") {
         content += `-${COD_WORD_LIMIT}`;
       }
       content += `)\n\n`;
 
       thread.messages.forEach(msg => {
+        if (msg.isPlaceholder) return; // Skip placeholder messages
+        
         const prefix = msg.sender.toUpperCase();
         
         // Add word count info for bot messages
         let headerInfo = prefix;
-        if (msg.sender === "bot" && !msg.isPlaceholder && msg.wordCount !== undefined) {
+        if (msg.sender === "bot" && msg.wordCount !== undefined) {
           let countInfo = `[${msg.wordCount} words - ${msg.reasoningMethod || REASONING_METHOD.toUpperCase()}]`;
           if (msg.thinkingWordCount !== undefined && msg.answerWordCount !== undefined) {
             countInfo += ` (thinking: ${msg.thinkingWordCount}, answer: ${msg.answerWordCount})`;
@@ -3446,19 +3453,26 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
         if (msg.sender === "bot" && msg.thinking && msg.answer) {
           content += `THINKING STEPS:\n${msg.thinking}\n\nFINAL ANSWER:\n${msg.answer}\n`;
         } else {
-          const parsed = parseContentForExport(msg.content);
-          parsed.forEach(item => {
-            if (item.type === 'text') {
-              content += item.content + '\n';
-            } else if (item.type === 'code') {
-              const lang = item.language ? ` (${item.language})` : '';
-              content += `----- CODE BLOCK START${lang} -----\n`;
-              item.content.forEach(line => {
-                content += `  ${line}\n`;
-              });
-              content += `----- CODE BLOCK END -----\n`;
-            }
-          });
+          // Use the fixed parseContentForExport function
+          try {
+            const parsed = parseContentForExport(msg.content || "");
+            parsed.forEach(item => {
+              if (item.type === 'text') {
+                content += item.content + '\n';
+              } else if (item.type === 'code') {
+                const lang = item.language ? ` (${item.language})` : '';
+                content += `----- CODE BLOCK START${lang} -----\n`;
+                item.content.forEach(line => {
+                  content += `  ${line}\n`;
+                });
+                content += `----- CODE BLOCK END -----\n`;
+              }
+            });
+          } catch (error) {
+            console.error("Error parsing message content:", error);
+            // Fallback to raw content if parsing fails
+            content += (msg.content || "") + '\n';
+          }
         }
         content += '\n';
       });
@@ -3467,11 +3481,14 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${thread.name}.txt`;
+      a.download = `${thread.name || "Thread"}.txt`;
+      a.style.display = 'none';
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
       
       showNotification("TXT file downloaded");
     }
@@ -3481,45 +3498,71 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
      ***********************/
     function downloadCurrentThreadAsPdf() {
       const thread = threads.find(t => t.id === currentThreadId);
-      if (!thread) return;
+      if (!thread) {
+        showNotification("Error: No active thread found");
+        return;
+      }
 
       try {
-        // First check if jspdf is available in the expected format
-        if (typeof window.jspdf === 'undefined') {
-          console.error("jsPDF library not found in window.jspdf");
-          // Try alternate locations where jsPDF might be loaded
-          if (typeof jspdf !== 'undefined') {
-            window.jspdf = jspdf;
-          } else if (typeof window.jsPDF !== 'undefined') {
-            window.jspdf = { jsPDF: window.jsPDF };
-          } else {
-            throw new Error("jsPDF library not found. Please reload the page and try again.");
-          }
+        // Check if jsPDF is available
+        if (typeof window.jspdf === 'undefined' && typeof window.jsPDF === 'undefined') {
+          throw new Error("PDF generation library not available. Try downloading as TXT instead.");
+        }
+        
+        // Get jsPDF constructor - check all possible locations
+        const jsPDF = window.jspdf?.jsPDF || window.jsPDF || window.jspdf;
+        if (!jsPDF) {
+          throw new Error("PDF generation library not properly loaded.");
         }
 
-        // Now create the PDF document
-        const jsPDF = window.jspdf.jsPDF || window.jspdf;
+        // Create PDF document
         const doc = new jsPDF({
+          orientation: "portrait",
           unit: "pt",
           format: "letter"
         });
 
+        // Helper function to set background color for pages
         function setPageBackground(doc) {
           doc.setFillColor(30, 30, 30);
           doc.rect(0, 0, doc.internal.pageSize.width, doc.internal.pageSize.height, 'F');
         }
 
+        // Set background for the first page
         setPageBackground(doc);
+        
+        // Set text color and font
         doc.setTextColor(224, 224, 224);
+        doc.setFont("helvetica");
 
+        // Add title
         let yPos = 40;
+        doc.setFontSize(16);
+        const title = thread.name || "Thread";
+        doc.text(title, 40, yPos);
+        yPos += 20;
+
+        // Add model info
+        doc.setFontSize(12);
+        let modelText = `Model: ${MODEL_NAME_DISPLAY || "Unknown"} (${REASONING_METHOD.toUpperCase()}`;
+        if (REASONING_METHOD === "cod") {
+          modelText += `-${COD_WORD_LIMIT}`;
+        }
+        modelText += `)`;
+        doc.text(modelText, 40, yPos);
+        yPos += 30;
+
+        // Helper constants
         const lineHeight = 14;
         const leftMargin = 40;
-        const pageHeight = doc.internal.pageSize.height - 50; // Margin at bottom
+        const rightMargin = 40;
+        const pageWidth = doc.internal.pageSize.getWidth ? doc.internal.pageSize.getWidth() : doc.internal.pageSize.width;
+        const pageHeight = (doc.internal.pageSize.getHeight ? doc.internal.pageSize.getHeight() : doc.internal.pageSize.height) - 50; // Margin at bottom
+        const maxLineWidth = pageWidth - leftMargin - rightMargin;
 
-        // Check if we need a new page
-        function checkNewPage() {
-          if (yPos > pageHeight) {
+        // Helper function to check if we need a new page
+        function checkNewPage(requiredHeight = lineHeight) {
+          if (yPos + requiredHeight > pageHeight) {
             doc.addPage();
             setPageBackground(doc);
             yPos = 40;
@@ -3528,11 +3571,153 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
           return false;
         }
 
-        // Rest of the PDF generation code remains the same
-        // ...existing PDF generation code...
+        // Helper function to split text into lines that fit the page width
+        function splitTextToFitPage(text, fontSize = 12) {
+          doc.setFontSize(fontSize);
+          return doc.splitTextToSize(text, maxLineWidth);
+        }
 
-        doc.save(`${thread.name}.pdf`);
+        // Process each message
+        thread.messages.forEach((msg, index) => {
+          if (msg.isPlaceholder) return; // Skip placeholder messages
+          
+          // Add spacer between messages
+          if (index > 0) {
+            yPos += 20;
+            checkNewPage();
+          }
+
+          // Message sender and timestamp
+          doc.setFontSize(12);
+          doc.setFont("helvetica", "bold");
+          
+          const sender = msg.sender.toUpperCase();
+          let headerText = sender;
+          
+          // Add word count info for bot messages
+          if (msg.sender === "bot" && msg.wordCount !== undefined) {
+            let countInfo = `[${msg.wordCount} words - ${msg.reasoningMethod || REASONING_METHOD.toUpperCase()}]`;
+            headerText += ` ${countInfo}`;
+          }
+
+          doc.text(headerText, leftMargin, yPos);
+          yPos += lineHeight * 1.5;
+          checkNewPage();
+
+          // Message content
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(11);
+
+          // Handle messages with thinking/answer components separately
+          if (msg.sender === "bot" && msg.thinking && msg.answer) {
+            // Thinking section
+            doc.setFont("helvetica", "bold");
+            doc.text("THINKING STEPS:", leftMargin, yPos);
+            yPos += lineHeight * 1.5;
+            checkNewPage();
+            
+            doc.setFont("helvetica", "normal");
+            const thinkingLines = splitTextToFitPage(msg.thinking);
+            thinkingLines.forEach(line => {
+              checkNewPage();
+              doc.text(line, leftMargin, yPos);
+              yPos += lineHeight;
+            });
+            
+            yPos += lineHeight;
+            checkNewPage();
+            
+            // Answer section
+            doc.setFont("helvetica", "bold");
+            doc.text("FINAL ANSWER:", leftMargin, yPos);
+            yPos += lineHeight * 1.5;
+            checkNewPage();
+            
+            doc.setFont("helvetica", "normal");
+            const answerLines = splitTextToFitPage(msg.answer);
+            answerLines.forEach(line => {
+              checkNewPage();
+              doc.text(line, leftMargin, yPos);
+              yPos += lineHeight;
+            });
+          } else {
+            // Regular message content
+            try {
+              // Try to parse content with code blocks
+              const parsed = parseContentForExport(msg.content || "");
+              
+              let isInCodeBlock = false;
+              
+              parsed.forEach(item => {
+                if (item.type === 'text') {
+                  if (isInCodeBlock) {
+                    isInCodeBlock = false;
+                    yPos += lineHeight;
+                    checkNewPage();
+                  }
+                  
+                  const lines = splitTextToFitPage(item.content);
+                  lines.forEach(line => {
+                    checkNewPage();
+                    doc.text(line, leftMargin, yPos);
+                    yPos += lineHeight;
+                  });
+                } else if (item.type === 'code') {
+                  // Mark start of code block
+                  yPos += lineHeight / 2;
+                  checkNewPage();
+                  
+                  doc.setFont("courier", "normal");
+                  doc.setFontSize(9);
+                  
+                  const langLabel = item.language ? ` (${item.language})` : '';
+                  doc.text(`----- CODE BLOCK START${langLabel} -----`, leftMargin, yPos);
+                  yPos += lineHeight;
+                  
+                  // Print code content with slight indent
+                  item.content.forEach(line => {
+                    checkNewPage();
+                    const codeLine = `  ${line}`;
+                    const codeLines = splitTextToFitPage(codeLine, 9);
+                    codeLines.forEach(l => {
+                      checkNewPage();
+                      doc.text(l, leftMargin, yPos);
+                      yPos += lineHeight;
+                      checkNewPage();
+                    });
+                  });
+                  
+                  // Mark end of code block
+                  checkNewPage();
+                  doc.text(`----- CODE BLOCK END -----`, leftMargin, yPos);
+                  yPos += lineHeight;
+                  
+                  // Reset font for normal text
+                  doc.setFont("helvetica", "normal");
+                  doc.setFontSize(11);
+                  
+                  isInCodeBlock = true;
+                }
+              });
+            } catch (error) {
+              console.error("Error parsing message for PDF:", error);
+              // Fallback for parsing errors - just add the content directly
+              if (msg.content) {
+                const lines = splitTextToFitPage(msg.content || "");
+                lines.forEach(line => {
+                  checkNewPage();
+                  doc.text(line, leftMargin, yPos);
+                  yPos += lineHeight;
+                });
+              }
+            }
+          }
+        });
+
+        // Save the PDF
+        doc.save(`${thread.name || "Thread"}.pdf`);
         showNotification("PDF file downloaded");
+        
       } catch (error) {
         console.error("PDF generation error:", error);
         showNotification("Error generating PDF: " + error.message);

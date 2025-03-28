@@ -67,8 +67,8 @@ module.exports = async (req, res) => {
     const apiEndpoint = 'https://api.fireworks.ai/inference/v1/chat/completions';
     
     // Validate max_tokens (Fireworks models accept different limits based on model)
-    const originalMaxTokens = requestBody.max_tokens || 4096;
-    const validatedMaxTokens = Math.min(Math.max(1, originalMaxTokens), 8192);
+    const originalMaxTokens = requestBody.max_tokens || 4008;
+    const validatedMaxTokens = Math.min(Math.max(1, originalMaxTokens), 40000);
     
     if (originalMaxTokens !== validatedMaxTokens) {
       console.log(`Adjusted max_tokens from ${originalMaxTokens} to ${validatedMaxTokens}`);
@@ -78,8 +78,11 @@ module.exports = async (req, res) => {
       model: requestBody.model,
       messages: requestBody.messages,
       max_tokens: validatedMaxTokens,
-      temperature: requestBody.temperature,
-      top_p: requestBody.top_p,
+      temperature: requestBody.temperature !== undefined ? requestBody.temperature : 0.6,
+      top_p: requestBody.top_p !== undefined ? requestBody.top_p : 1,
+      top_k: requestBody.top_k !== undefined ? requestBody.top_k : 40,
+      presence_penalty: requestBody.presence_penalty !== undefined ? requestBody.presence_penalty : 0,
+      frequency_penalty: requestBody.frequency_penalty !== undefined ? requestBody.frequency_penalty : 0,
       stream: true  // Force streaming mode
     };
 

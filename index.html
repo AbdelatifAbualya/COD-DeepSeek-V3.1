@@ -4710,7 +4710,7 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
 
         // Check if we should use streaming
         if (ENABLE_STREAMING) {
-          console.log("Using streaming mode for this request");
+          console.log("Using streaming mode with Edge Function");
           
           try {
             // Update the placeholder to indicate streaming
@@ -4719,10 +4719,10 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
             
             // Prepare to collect the full response
             let fullResponse = "";
-            let eventSource = null;
+            let renderPending = false;
             
-            // First send the initial request to start the stream
-            const initResponse = await fetch(`/api/streaming${cacheBuster}`, {
+            // First send the initial request to start the stream - use the Edge Function endpoint
+            const initResponse = await fetch(`/api/streaming-edge${cacheBuster}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(payload)
@@ -4735,9 +4735,6 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
             // Set up event source for streaming
             const reader = initResponse.body.getReader();
             const decoder = new TextDecoder();
-            
-            // Flag to track if we're still receiving the first parts
-            let isFirstChunks = true;
             
             // Process the stream
             while (true) {
@@ -4757,7 +4754,7 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
               for (const line of lines) {
                 if (line.startsWith('data: ')) {
                   // Extract the data part
-                  const dataText = line.slice(6);
+                  const dataText = line.slice(6).trim();
                   
                   // Special end marker
                   if (dataText === '[DONE]') {
@@ -4766,9 +4763,14 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
                   }
                   
                   try {
-                    // Ensure dataText is proper JSON before parsing
-                    const trimmedDataText = dataText.trim();
-                    const data = JSON.parse(trimmedDataText);
+                    // Attempt to parse as JSON
+                    const data = JSON.parse(dataText);
+                    
+                    // Check for errors from server
+                    if (data.error === true) {
+                      console.error("Streaming error:", data.message);
+                      throw new Error(data.message || "Unknown streaming error");
+                    }
                     
                     // Check for completion
                     if (data.done === true) {
@@ -4776,15 +4778,12 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
                       continue;
                     }
                     
-                    // Check for errors
-                    if (data.error === true) {
-                      throw new Error(data.message || "Unknown streaming error");
-                    }
-                    
                     // Extract new content
                     if (data.choices && data.choices[0]) {
                       // Get the content delta or content (different APIs may use different formats)
-                      const contentDelta = data.choices[0].delta?.content || data.choices[0].message?.content || "";
+                      const contentDelta = data.choices[0].delta?.content || 
+                                          data.choices[0].message?.content || 
+                                          "";
                       
                       if (contentDelta) {
                         // Add to full response
@@ -4799,15 +4798,40 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
                           isStreaming: true // Flag as streaming
                         };
                         
-                        // Only render after significant content to avoid re-rendering too often
-                        if (isFirstChunks || fullResponse.length % 20 === 0) {
-                          renderCurrentThreadMessages();
-                          isFirstChunks = false;
+                        // Use requestAnimationFrame for smoother rendering
+                        if (!renderPending) {
+                          renderPending = true;
+                          requestAnimationFrame(() => {
+                            renderCurrentThreadMessages();
+                            renderPending = false;
+                          });
                         }
                       }
                     }
                   } catch (parseError) {
-                    console.warn("Error parsing streaming data:", parseError);
+                    // If not valid JSON, just append it as raw text
+                    if (dataText && dataText !== '') {
+                      console.log("Non-JSON data received:", dataText);
+                      fullResponse += dataText;
+                      
+                      // Update the message with the raw text
+                      thread.messages[placeholderIndex] = {
+                        content: fullResponse,
+                        sender: "bot",
+                        isPlaceholder: false,
+                        timestamp: new Date(),
+                        isStreaming: true
+                      };
+                      
+                      // Use requestAnimationFrame for smoother rendering
+                      if (!renderPending) {
+                        renderPending = true;
+                        requestAnimationFrame(() => {
+                          renderCurrentThreadMessages();
+                          renderPending = false;
+                        });
+                      }
+                    }
                   }
                 }
               }
@@ -4832,7 +4856,7 @@ A: First segment: The car travels at 60 mph for 2 hours, so the distance covered
             // Process bot message to separate thinking and answer parts
             const processed = processBotMessage(fullResponse, REASONING_METHOD);
             
-            // Update with the finalized message
+            // Update with the finalized message (not streaming anymore)
             thread.messages[placeholderIndex] = {
               content: fullResponse,
               sender: "bot",

@@ -12,16 +12,12 @@
   ],
   "routes": [
     { "src": "/api/perplexity", "dest": "/api/perplexity.js" },
-    { "src": "/api/streaming-edge", "dest": "/api/streaming-edge" },
+    { "src": "/api/streaming-edge", "dest": "/api/streaming-edge.js" },
     { "src": "/api/streaming", "dest": "/api/streaming.js" },
     { "src": "/api/proxy", "dest": "/api/proxy.js" },
     { "src": "/api/rag", "dest": "/api/rag.js" },
     { "src": "/api/mongodb-status", "dest": "/api/mongodb-status.js" },
     { "src": "/api/(.*)", "dest": "/api/api-proxy.js" },
-    { "src": "/(.*)", "dest": "/index.html" },
-    { "src": "/api/api-proxy", "dest": "/api/api-proxy" }
-  ],
-  "env": {
-    "FIREWORKS_API_KEY": "fireworks_api_key"
-  }
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
 }

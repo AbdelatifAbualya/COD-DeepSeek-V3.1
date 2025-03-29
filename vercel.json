@@ -6,17 +6,13 @@
     { "src": "api/perplexity.js", "use": "@vercel/node" },
     { "src": "api/proxy.js", "use": "@vercel/node" },
     { "src": "api/streaming.js", "use": "@vercel/node" },
-    { "src": "api/rag.js", "use": "@vercel/node" },
-    { "src": "api/mongodb-status.js", "use": "@vercel/node" },
-    { "src": "api/streaming-edge.js", "use": "@vercel/edge" }
+    { "src": "api/rag.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/streaming-edge", "dest": "/api/streaming-edge.js" },
     { "src": "/api/perplexity", "dest": "/api/perplexity.js" },
     { "src": "/api/streaming", "dest": "/api/streaming.js" },
     { "src": "/api/proxy", "dest": "/api/proxy.js" },
     { "src": "/api/rag", "dest": "/api/rag.js" },
-    { "src": "/api/mongodb-status", "dest": "/api/mongodb-status.js" },
     { "src": "/api/(.*)", "dest": "/api/api-proxy.js" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]

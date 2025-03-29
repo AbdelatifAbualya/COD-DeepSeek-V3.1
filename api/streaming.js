@@ -1,171 +1,224 @@
-// Node.js compatible function for streaming API responses
+// api/streaming.js
+// This file is needed for streaming support - it seems it's missing from your files
+
 const fetch = require('node-fetch');
+const { createReadStream } = require('stream');
 
 module.exports = async (req, res) => {
-  // Log function invocation
-  console.log("Streaming API called:", new Date().toISOString());
-
-  // Handle OPTIONS request for CORS
+  // Enable CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.status(204).end();
-    return;
+    return res.status(204).end();
   }
 
-  // Only allow POST requests
   if (req.method !== 'POST') {
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Allow', 'POST');
-    res.status(405).json({ error: 'Method Not Allowed' });
-    return;
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    // Get the Fireworks API key from environment variables
+    // Parse the request body
+    const requestBody = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+
+    // Get the API key from environment
     const apiKey = process.env.FIREWORKS_API_KEY;
-    console.log("Environment check: FIREWORKS_API_KEY exists?", !!apiKey);
-    
     if (!apiKey) {
-      console.error("ERROR: Fireworks API key is missing in environment variables");
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.status(500).json({
-        error: 'API key not configured',
-        message: 'Please set FIREWORKS_API_KEY in your Vercel environment variables'
-      });
-      return;
+      return res.status(500).json({ error: 'API key not configured on server' });
     }
 
-    // Parse request body
-    let requestBody;
-    try {
-      requestBody = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    } catch (parseError) {
-      console.error("Failed to parse request body:", parseError);
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.status(400).json({
-        error: 'Invalid JSON in request body',
-        message: parseError.message
-      });
-      return;
-    }
-
-    // Log request information
-    const modelName = requestBody.model || 'unknown';
-    console.log('Streaming request received for model:', modelName);
-    
-    // Enable streaming if not explicitly set
-    if (requestBody.stream === undefined) {
-      requestBody.stream = true;
-    }
-    
-    // Prepare request for Fireworks API
-    const apiEndpoint = 'https://api.fireworks.ai/inference/v1/chat/completions';
-    
-    // Validate max_tokens (Fireworks models accept different limits based on model)
-    const originalMaxTokens = requestBody.max_tokens || 4008;
-    const validatedMaxTokens = Math.min(Math.max(1, originalMaxTokens), 40000);
-    
-    if (originalMaxTokens !== validatedMaxTokens) {
-      console.log(`Adjusted max_tokens from ${originalMaxTokens} to ${validatedMaxTokens}`);
-    }
-    
-    const cleanedParams = {
-      model: requestBody.model,
-      messages: requestBody.messages,
-      max_tokens: validatedMaxTokens,
-      temperature: requestBody.temperature !== undefined ? requestBody.temperature : 0.6,
-      top_p: requestBody.top_p !== undefined ? requestBody.top_p : 1,
-      top_k: requestBody.top_k !== undefined ? requestBody.top_k : 40,
-      presence_penalty: requestBody.presence_penalty !== undefined ? requestBody.presence_penalty : 0,
-      frequency_penalty: requestBody.frequency_penalty !== undefined ? requestBody.frequency_penalty : 0,
-      stream: true  // Force streaming mode
-    };
-
-    // Remove undefined or null values
-    Object.keys(cleanedParams).forEach(key => {
-      if (cleanedParams[key] === undefined || cleanedParams[key] === null) {
-        delete cleanedParams[key];
-      }
-    });
-    
-    // Set up headers for streaming response
+    // Set up SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.flushHeaders(); // Important for streaming
-    
-    // Set up the Fireworks API request
-    const apiRequestOptions = {
+
+    // Send request to Fireworks API
+    const response = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify(cleanedParams)
-    };
-    
-    try {
-      // Call the Fireworks API to get the streaming response
-      const response = await fetch(apiEndpoint, apiRequestOptions);
-      
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
-      }
-      
-      // Get the readable stream from the response
-      const apiStream = response.body;
-      
-      // Set up event listeners for the stream
-      apiStream.on('data', (chunk) => {
-        // Send each chunk directly to the client
-        res.write(chunk);
-        // Flush to ensure streaming
-        res.flush && res.flush();
-      });
-      
-      apiStream.on('end', () => {
-        // Ensure [DONE] is sent to close the client connection
-        res.write('data: [DONE]\n\n');
-        res.end();
-      });
-      
-      apiStream.on('error', (error) => {
-        console.error('Stream error:', error);
-        res.write(`data: ${JSON.stringify({error: true, message: error.message})}\n\n`);
-        res.write('data: [DONE]\n\n');
-        res.end();
-      });
-      
-      // Handle client disconnection
-      req.on('close', () => {
-        console.log('Client closed connection');
-        apiStream.destroy();
-        res.end();
-      });
-      
-    } catch (error) {
-      console.error('API request error:', error);
-      res.write(`data: ${JSON.stringify({error: true, message: error.message})}\n\n`);
-      res.write('data: [DONE]\n\n');
-      res.end();
-    }
-  } catch (error) {
-    console.error('Function error:', error.name, error.message);
-    
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.status(500).json({
-      error: error.message || 'Unknown error',
-      details: {
-        name: error.name,
-        message: error.message
-      }
+      body: JSON.stringify(requestBody)
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      // Send error as an event
+      res.write(`data: ${JSON.stringify({ error: true, message: errorText })}\n\n`);
+      res.end();
+      return;
+    }
+
+    // Pipe the stream directly to the client
+    const stream = response.body;
+    stream.on('data', (chunk) => {
+      res.write(`data: ${chunk.toString()}\n\n`);
+    });
+
+    stream.on('end', () => {
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+    });
+
+    stream.on('error', (err) => {
+      console.error('Stream error:', err);
+      res.write(`data: ${JSON.stringify({ error: true, message: err.message })}\n\n`);
+      res.end();
+    });
+
+  } catch (error) {
+    console.error('Error:', error);
+    res.write(`data: ${JSON.stringify({ error: true, message: error.message })}\n\n`);
+    res.end();
   }
 };
+
+// Fixed Perplexity Integration
+function initWebSearch() {
+  const btn = document.getElementById('webSearchBtn');
+  if (!btn) return;
+  
+  // Update button tooltip with more informative text
+  btn.title = "Toggle web search with Perplexity";
+  
+  // Load saved preference - check both keys for backward compatibility
+  const webSearchEnabled = localStorage.getItem('webSearchEnabled') === 'true';
+  const perplexityEnabled = localStorage.getItem('usePerplexity') === 'true';
+  
+  // Use either setting, prioritizing webSearchEnabled
+  enableWebSearch = webSearchEnabled || perplexityEnabled;
+  
+  // Key fix: Set the usePerplexity variable that's used by the sendMessage function
+  window.usePerplexity = enableWebSearch; // Make sure they stay in sync
+  
+  // Update both settings to be consistent
+  localStorage.setItem('webSearchEnabled', enableWebSearch.toString());
+  localStorage.setItem('usePerplexity', enableWebSearch.toString());
+  
+  // Update button appearance
+  if (enableWebSearch) {
+    btn.style.backgroundColor = 'var(--accent-primary)';
+    btn.style.color = 'white';
+    btn.title = "Web search is enabled (click to disable)";
+  } else {
+    btn.style.backgroundColor = 'var(--bg-component)';
+    btn.style.color = 'var(--text-secondary)';
+    btn.title = "Web search is disabled (click to enable)";
+  }
+  
+  // Add event listener with error handling
+  try {
+    // Remove any existing listeners to prevent duplicates
+    const newBtn = btn.cloneNode(true);
+    btn.parentNode.replaceChild(newBtn, btn);
+    
+    // Fix: Properly set the toggle function to update both variables
+    newBtn.addEventListener('click', () => {
+      // Toggle both flags to keep them in sync
+      enableWebSearch = !enableWebSearch;
+      window.usePerplexity = enableWebSearch;
+      
+      // Store preference - save both for backward compatibility
+      localStorage.setItem('webSearchEnabled', enableWebSearch.toString());
+      localStorage.setItem('usePerplexity', enableWebSearch.toString());
+      
+      // Update button appearance with transition
+      if (enableWebSearch) {
+        newBtn.style.backgroundColor = 'var(--accent-primary)';
+        newBtn.style.color = 'white';
+        newBtn.title = "Web search is enabled (click to disable)";
+      } else {
+        newBtn.style.backgroundColor = 'var(--bg-component)';
+        newBtn.style.color = 'var(--text-secondary)';
+        newBtn.title = "Web search is disabled (click to enable)";
+      }
+      
+      // Show notification
+      showNotification(enableWebSearch ? 'Web search enabled' : 'Web search disabled');
+      
+      console.log(`Web search ${enableWebSearch ? 'enabled' : 'disabled'}`);
+    });
+    
+    console.log("Web search button event listener initialized successfully");
+  } catch (error) {
+    console.error("Error setting up web search button:", error);
+  }
+}
+
+// Fix for Perplexity API query function
+async function queryPerplexity(question) {
+  try {
+    // Add timestamp to URL to prevent caching
+    const timestamp = new Date().getTime();
+    const cacheBuster = `?t=${timestamp}`;
+    
+    console.log("Querying Perplexity for:", question);
+    
+    // Set a reasonable timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 seconds timeout
+    
+    const response = await fetch(`/api/perplexity${cacheBuster}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ query: question }),
+      signal: controller.signal
+    });
+    
+    // Clear the timeout
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      let errorMessage = `Status: ${response.status}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.message || errorMessage;
+      } catch (e) {
+        // If we can't parse JSON, try text
+        try {
+          errorMessage = await response.text() || errorMessage;
+        } catch (e2) {
+          // If all else fails, use status code
+          errorMessage = `Status: ${response.status}`;
+        }
+      }
+      throw new Error(`Perplexity API error: ${errorMessage}`);
+    }
+    
+    const data = await response.json();
+    
+    // Improved response handling
+    if (!data) {
+      throw new Error("Empty response from Perplexity API");
+    }
+    
+    console.log("Perplexity response:", data);
+    
+    // Return structured data with consistent format
+    return {
+      answer: data.answer || data.text || (typeof data === 'string' ? data : "No answer provided"),
+      sources: data.sources || data.citations || [],
+      metadata: data.metadata || {}
+    };
+  } catch (error) {
+    console.error("Perplexity query error:", error);
+    
+    // Handle specific error types
+    let errorMessage = error.message;
+    if (error.name === "AbortError") {
+      errorMessage = "Request to Perplexity timed out. Please try again or use a shorter query.";
+    } else if (error.message.includes("Failed to fetch")) {
+      errorMessage = "Could not connect to the Perplexity API. Please check your internet connection.";
+    }
+    
+    return { 
+      error: error.message,
+      answer: `Error accessing Perplexity: ${errorMessage}. Please try again later or disable web search.`,
+      sources: []
+    };
+  }
+}

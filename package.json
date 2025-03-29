@@ -1,17 +1,11 @@
 {
-  "name": "enhanced-llm-playground",
+  "name": "chatbot-project",
   "version": "1.0.0",
-  "description": "An enhanced playground for large language models with RAG support",
   "scripts": {
-    "start": "vercel dev",
-    "import-data": "node scripts/import-data.js"
+    "start": "vercel dev"
   },
   "dependencies": {
-    "dotenv": "^16.0.3",
-    "mongodb": "^5.1.0",
-    "node-fetch": "^2.6.9"
-  },
-  "engines": {
-    "node": ">=16.0.0"
+    "node-fetch": "^2.6.1",
+    "mongodb": "^5.7.0"
   }
 }

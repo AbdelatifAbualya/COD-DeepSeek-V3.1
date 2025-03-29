@@ -2,7 +2,12 @@
   "version": 2,
   "builds": [
     { "src": "index.html", "use": "@vercel/static" },
-    { "src": "api/*.js", "use": "@vercel/node", "config": { "excludeFiles": ["api/streaming-edge.js"] } },
+    { "src": "api/api-proxy.js", "use": "@vercel/node" },
+    { "src": "api/perplexity.js", "use": "@vercel/node" },
+    { "src": "api/proxy.js", "use": "@vercel/node" },
+    { "src": "api/streaming.js", "use": "@vercel/node" },
+    { "src": "api/rag.js", "use": "@vercel/node" },
+    { "src": "api/mongodb-status.js", "use": "@vercel/node" },
     { "src": "api/streaming-edge.js", "use": "@vercel/edge" }
   ],
   "routes": [

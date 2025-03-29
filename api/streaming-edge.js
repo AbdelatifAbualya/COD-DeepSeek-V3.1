@@ -103,7 +103,7 @@ export default async function handler(request) {
     if (requestBody.temperature === undefined) requestBody.temperature = 0.6;
     
     // Validate max_tokens
-    requestBody.max_tokens = Math.min(Math.max(1, requestBody.max_tokens), 40000);
+    requestBody.max_tokens = Math.min(Math.max(1, requestBody.max_tokens), 8192);
     
     // Log request details for monitoring
     console.log(`Streaming request: model=${requestBody.model}`);
@@ -126,19 +126,6 @@ export default async function handler(request) {
     // Process in background
     (async () => {
       try {
-        // Add timing metrics for monitoring CoD vs CoT performance
-        let reasoningMethod = 'Standard';
-        if (requestBody.messages && requestBody.messages[0] && requestBody.messages[0].content) {
-          const systemPrompt = requestBody.messages[0].content;
-          if (systemPrompt.includes('Chain of Draft')) {
-            reasoningMethod = 'CoD';
-          } else if (systemPrompt.includes('Chain of Thought')) {
-            reasoningMethod = 'CoT';
-          }
-        }
-        
-        console.log(`Using reasoning method: ${reasoningMethod}`);
-        
         // Call the Fireworks API with streaming enabled
         const fireworksResponse = await fetch('https://api.fireworks.ai/inference/v1/chat/completions', {
           method: 'POST',
